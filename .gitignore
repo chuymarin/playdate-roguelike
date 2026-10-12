@@ -1,0 +1,7 @@
+# Playdate build output
+*.pdx
+/build/
+
+# OS cruft
+.DS_Store
+Thumbs.db

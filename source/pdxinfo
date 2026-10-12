@@ -1,0 +1,10 @@
+name=Roguelike
+author=Jesus Marin
+description=A tiny Zelda-like on a random 4x4 map: find the shield, the sword and the key, then the friend waiting in the dungeon.
+bundleID=com.jcmarin.roguelike
+imagePath=
+launchSoundPath=
+contentWarning=
+contentWarning2=
+buildNumber=1
+version=0.1.0
