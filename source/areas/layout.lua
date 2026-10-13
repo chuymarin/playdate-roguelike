@@ -97,10 +97,11 @@ local function inward(c, dir)
 	return c[1] + d[1], c[2] + d[2]
 end
 
--- Opens the border toward each linked neighbor. The dungeon's locked
--- entrance gets a gate object on its first cell (one id for both sides, so
--- opening it from one side opens it on the other) and closes the rest of
--- that gap; any other passage between dungeon and overworld gets a door tile.
+-- Opens the border toward each linked neighbor. A gate between two acts
+-- (cell.gates) or the dungeon door (cell.locked / lockedTo) becomes a gate
+-- object on the doorway's first cell, with one id for both sides, so
+-- opening it from one side opens it on the other; the rest of that gap is
+-- closed. Any other passage between dungeon and overworld gets a door tile.
 function layout.openings(area, ctx, borderTiles)
 	local cell, world, r = ctx.cell, ctx.world, ctx.r
 	local dungeonKit = ctx.kits.dungeon
@@ -109,7 +110,8 @@ function layout.openings(area, ctx, borderTiles)
 		if cell.links[dir] then
 			local cells = layout.sideCells(area, dir)
 			local other = world.gen.cells[cell.k + d[1] + d[2] * config.MAP]
-			local locked = cell.locked == dir or cell.lockedTo == dir
+			local dungeonDoor = cell.locked == dir or cell.lockedTo == dir
+			local locked = dungeonDoor or cell.gates[dir] ~= nil
 			local doorTile = nil
 			if locked then
 				doorTile = rng.pick(r, dungeonKit.locked)
@@ -135,7 +137,7 @@ function layout.openings(area, ctx, borderTiles)
 				Game.objects.add(area, "gate", c[1], c[2], {
 					lockedTile = doorTile,
 					openTile = rng.pick(r, dungeonKit.door),
-					lockedLines = Game.text.locked,
+					lockedLines = dungeonDoor and Game.text.locked or Game.text.gateLocked,
 				}, "gate:" .. math.min(a, b) .. "-" .. math.max(a, b))
 			end
 		end
