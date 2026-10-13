@@ -4,8 +4,9 @@ A tiny Zelda-like for the Playdate where every seed tells a different short
 story. You are a hero, and you need to achieve something. The story comes
 in **four acts**, and each act opens a new part of the world.
 
-The full rules are in **[the Rulebook](docs/RULEBOOK.md)**: how the world is
-built, what every object does, and the tables the story is rolled from.
+The full rules are in **[the Rulebook](https://app.notion.com/p/3f895764acd58115b348ce525d24aee4)**
+(in Notion, with the rest of the project docs): how the world is built, what
+every object does, and the tables the story is rolled from.
 
 ## The design in short
 
