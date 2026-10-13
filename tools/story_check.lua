@@ -2,20 +2,26 @@
 -- each one follows the Rulebook and can be finished (Rule 6.1). Run it
 -- after editing data/story.lua or data/objects.lua, before building.
 --
---   lua tools/story_check.lua [count] [--no-areas] [--source DIR]
+--   lua tools/story_check.lua [count] [--no-areas] [--source DIR] [--dump]
 --
 -- count       seeds 1..count (default 5000)
 -- --no-areas  skip building every area (faster; areas are built for the
 --             first 500 seeds by default to check every object's holes)
 -- --source    the game's source folder (default: ../source next to this file)
+-- --dump      instead of checking, print one line per seed describing its
+--             world (tiling, act order, entrance, captive, then per cell: act,
+--             shape, kind, role, chest, enemies, links, gates, dungeon door),
+--             to compare with the Room Scale Lab's port of the generator
 --
 -- Needs plain Lua 5.4. Exits with status 1 if any check fails.
 
-local count, buildAreas, source = 5000, true, nil
+local count, buildAreas, source, dump = 5000, true, nil, false
 local i = 1
 while arg[i] do
 	if arg[i] == "--no-areas" then
 		buildAreas = false
+	elseif arg[i] == "--dump" then
+		dump = true
 	elseif arg[i] == "--source" then
 		i = i + 1
 		source = arg[i]
@@ -419,6 +425,25 @@ local function checkWorld(seed, withAreas)
 end
 
 -- ---------- run ----------
+
+if dump then
+	for seed = 1, count do
+		local g = Game.storyRoller.roll(Game.worldgen.generate(seed))
+		local parts = { seed, g.tiling, table.concat(g.order, ""), g.entrance, g.goal }
+		for k = 0, MAP * MAP - 1 do
+			local c = g.cells[k]
+			local links, gates = "", ""
+			for _, d in ipairs(grid.DIRS) do
+				links = links .. (c.links[d[3]] and d[3] or "-")
+				gates = gates .. (c.gates[d[3]] and tostring(c.gates[d[3]]) or "-")
+			end
+			parts[#parts + 1] = table.concat({ c.act, c.shape, c.kind, c.role or "-", c.chest or "-", c.enemies, links, gates,
+				(c.locked or "-") .. (c.lockedTo or "-") }, ",")
+		end
+		print(table.concat(parts, " "))
+	end
+	os.exit(0)
+end
 
 local tableProblems = checkTables()
 for _, p in ipairs(tableProblems) do
