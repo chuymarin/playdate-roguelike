@@ -1,6 +1,6 @@
 name=Roguelike
 author=Jesus Marin
-description=A tiny Zelda-like on a random 4x4 map: find the shield, the sword and the key, then the friend waiting in the dungeon.
+description=A tiny Zelda-like in four acts on a random 4x4 map: open each region's gate and free the captive locked deep in the dungeon.
 bundleID=com.jcmarin.roguelike
 imagePath=
 launchSoundPath=
