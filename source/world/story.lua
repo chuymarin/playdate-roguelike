@@ -1,10 +1,11 @@
--- The story roller (Rulebook Chapter 6, step 6 and Appendix B): what every
--- area holds. It runs on its own sub-seed of the world seed, so it never
--- shifts the map's random sequence (and the Room Scale Lab, which only
--- shows the map, keeps matching).
+-- The story roller (Rulebook Chapter 6, step 6): what every area holds,
+-- read from the tables in data/story.lua. It runs on its own sub-seed of the
+-- world seed, so it never shifts the map's random sequence (the Room Scale
+-- Lab, which only shows the map, keeps matching).
 --
--- Fills in, per cell: chest (the item in its chest), enemies; and on the
--- world: keys[act] (the cell holding each act's key), sword, cellKey.
+-- Fills in, per cell: chest (the item in its chest) and enemies; on the
+-- world: placed[item] = { cells holding it }, and for the villagers' hints
+-- keys[act] (the cell with each act's key), sword, cellKey.
 
 local rng <const> = Game.rng
 local grid <const> = Game.grid
@@ -13,60 +14,93 @@ local story = {}
 
 local SALT <const> = 7
 
-function story.roll(gen)
-	local r = rng.new(rng.derive(gen.seed, SALT))
-	local cells, links = gen.cells, gen.links
-	local farthest = Game.worldgen.farthest
-	gen.keys = {}
+-- Where you come into each act's region: home, then each gate's far side.
+local function entry(gen, act)
+	if act == 1 then
+		return gen.start
+	end
+	return gen.gates[act - 1].to
+end
 
-	local function except(list, ...)
-		local skip = { ... }
-		return grid.filter(list, function(k)
-			return not grid.contains(skip, k)
+-- Places one act's chests. Errors name the table row, for the check tool.
+local function placeAct(r, gen, act, rows)
+	local cells, links = gen.cells, gen.links
+	local open = grid.filter(gen.actCells[act], function(k)
+		return k ~= gen.goal
+	end)
+	local function take(k, item)
+		cells[k].chest = item
+		gen.placed[item] = gen.placed[item] or {}
+		table.insert(gen.placed[item], k)
+		open = grid.filter(open, function(j)
+			return j ~= k
 		end)
 	end
-
-	-- Act I: the shield at home, the key farthest from home
-	cells[gen.start].chest = "shield"
-	local rest = except(gen.actCells[1], gen.start)
-	gen.keys[1] = farthest(r, rest, gen.start, links)
-	-- Acts II and III: the key farthest from where you come in
-	for act = 2, 3 do
-		gen.keys[act] = farthest(r, gen.actCells[act], gen.gates[act - 1].to, links)
-	end
-	for act = 1, 3 do
-		cells[gen.keys[act]].chest = "key"
-	end
-	gen.sword = rng.pick(r, except(gen.actCells[2], gen.keys[2]))
-	cells[gen.sword].chest = "sword"
-	-- Act IV: the dungeon key at the entrance, the cell key in the deepest
-	-- other room
-	cells[gen.entrance].chest = "key"
-	gen.keys[4] = gen.entrance
-	local rooms = except(gen.actCells[4], gen.entrance, gen.goal)
-	gen.cellKey = farthest(r, rooms, gen.entrance, links)
-	cells[gen.cellKey].chest = "cellKey"
-	-- every other area: a heart
-	for k, cell in pairs(cells) do
-		if not cell.chest and k ~= gen.goal then
-			cell.chest = "heart"
+	for i, row in ipairs(rows) do
+		local where = ("act %d chest %d (%s)"):format(act, i, tostring(row.item))
+		assert(Game.items[row.item], where .. ": no such item")
+		if row.at == "rest" then
+			for _, k in ipairs(open) do
+				take(k, row.item)
+			end
+		else
+			local k
+			if row.at == "home" then
+				k = gen.start
+			elseif row.at == "entrance" then
+				k = gen.entrance
+			elseif row.at == "farthest" then
+				k = #open > 0 and Game.worldgen.farthest(r, open, entry(gen, act), links) or nil
+			elseif row.at == "any" then
+				k = rng.pick(r, open)
+			else
+				error(where .. ": unknown place " .. tostring(row.at))
+			end
+			assert(k and grid.contains(open, k), where .. ": no area left for it")
+			take(k, row.item)
 		end
 	end
+end
 
-	-- enemies: none in towns and camps; in Act I only one, since you can
-	-- only push them; the sword's guard is alone too (you get there without
-	-- it); dungeon enemies sometimes
+function story.roll(gen)
+	local tables = Game.story
+	local r = rng.new(rng.derive(gen.seed, SALT))
+	local cells = gen.cells
+	gen.placed = {}
+
+	for act = 1, 4 do
+		placeAct(r, gen, act, tables.acts[act].chests or {})
+	end
+	gen.keys = {}
+	for _, k in ipairs(gen.placed.key or {}) do
+		gen.keys[cells[k].act] = k
+	end
+	gen.sword = gen.placed.sword and gen.placed.sword[1]
+	gen.cellKey = gen.placed.cellKey and gen.placed.cellKey[1]
+
+	-- enemies (never in the captive's room)
+	local alone = {}
+	for _, item in ipairs(tables.alone or {}) do
+		alone[item] = true
+	end
 	for k = 0, Game.config.MAP * Game.config.MAP - 1 do
 		local cell = cells[k]
-		if cell.kind == "forest" or cell.kind == "ruins" then
-			cell.enemies = 1 + (r() < 0.4 and 1 or 0)
-			if cell.act == 1 or k == gen.sword then
-				cell.enemies = 1
+		local e = tables.enemies[cell.kind]
+		cell.enemies = 0
+		if e and k ~= gen.goal then
+			local n = e.min
+			for _ = e.min + 1, e.max do
+				if r() < (e.chance or 0) then
+					n = n + 1
+				end
 			end
-		elseif cell.kind == "entrance" then
-			cell.enemies = 1
-		elseif cell.kind == "dungeon" and k ~= gen.goal then
-			cell.enemies = r() < 0.7 and 1 or 0
+			if cell.act == 1 then
+				n = math.min(n, tables.firstAct or n)
+			end
+			if cell.chest and alone[cell.chest] then
+				n = math.min(n, 1)
+			end
+			cell.enemies = n
 		end
 	end
 	return gen
