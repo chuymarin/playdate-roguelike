@@ -33,22 +33,17 @@ function pickup.open(area, chest)
 end
 
 -- Gives the item to the player and removes it from the area. Returns the
--- lines to show (Game.text[item]).
+-- item's definition (data/items.lua), which says how to announce it.
 function pickup.collect(area, index, player)
 	local it = table.remove(area.items, index)
-	if it.item == "shield" then
-		player.hasShield = true
-	elseif it.item == "sword" then
-		player.hasSword = true
-	elseif it.item == "key" then
-		player.keys = player.keys + 1
-	elseif it.item == "cellKey" then
-		player.cellKey = true
-	elseif it.item == "heart" then
+	local def = Game.items[it.item]
+	if def.heart then
 		player.maxHearts = player.maxHearts + 1
 		player.hearts = player.maxHearts
+	else
+		player:give(it.item)
 	end
-	return Game.text[it.item]
+	return def
 end
 
 function pickup.draw(area, tiles, kits, toScreen, size)

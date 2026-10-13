@@ -1,4 +1,5 @@
--- The player: position in the room, facing, hearts and what they carry.
+-- The player: position in the room, facing, hearts and what they carry
+-- (items[id] = count, see data/items.lua).
 --
 -- The sword (Ⓐ) appears for a few frames in the tile in front of the
 -- player. Its tile points right: facing left it's mirrored, and facing up
@@ -27,15 +28,42 @@ function Player.new(tile)
 		flipX = false,
 		hearts = config.MAX_HEARTS,
 		maxHearts = config.MAX_HEARTS,
-		keys = 0,
-		cellKey = false,
-		hasSword = false,
-		hasShield = false,
+		items = {},
 		invulnerable = 0,
 		swing = 0,
 		guard = 0,
 		swordFlip = gfx.kImageUnflipped,
 	}, Player)
+end
+
+-- True when carrying at least n (default 1) of item id.
+function Player:has(id, n)
+	return (self.items[id] or 0) >= (n or 1)
+end
+
+function Player:give(id)
+	self.items[id] = (self.items[id] or 0) + 1
+end
+
+-- Removes one; returns false if there was none.
+function Player:take(id)
+	local n = self.items[id] or 0
+	if n == 0 then
+		return false
+	end
+	self.items[id] = n > 1 and n - 1 or nil
+	return true
+end
+
+-- True when a carried item gives this ability ("swing", "guard").
+function Player:can(ability)
+	for id in pairs(self.items) do
+		local def = Game.items[id]
+		if def and def.ability == ability then
+			return true
+		end
+	end
+	return false
 end
 
 function Player:face(dir)

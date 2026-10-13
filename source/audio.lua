@@ -14,7 +14,8 @@ local function sample(name)
 	return samples[name]
 end
 
--- Names: sword, shield, hit, hurt, chest, pickup, unlock, door, locked, faint, win.
+-- Names: sword, shield, hit, hurt, chest, pickup, coin, unlock, door, locked,
+-- faint, win.
 function audio.play(name)
 	local s = sample(name)
 	if s then

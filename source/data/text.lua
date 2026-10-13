@@ -16,6 +16,7 @@ Game.text = {
 	theEnd = { "The end. Press Ⓐ for a new world." },
 	greetings = { "Hello, traveler!", "Oh! A visitor.", "Nice day for a walk, isn't it?", "Mind the monsters out there." },
 	camp = "Rested at camp",
+	coin = "+1 coin",
 	unlocked = "The door is open",
 	cellOpened = "The cell is open",
 }

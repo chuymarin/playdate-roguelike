@@ -22,6 +22,7 @@ SOUNDS = {
     "hurt": "retro2_hurt1",
     "chest": "creak1",
     "pickup": "retro2_upgrade1",
+    "coin": "handleCoins",
     "unlock": "metalLatch",
     "door": "doorOpen_2",
     "locked": "doorOpen_1",

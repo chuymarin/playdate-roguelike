@@ -197,8 +197,14 @@ function Explore:tryMove(dir)
 
 	local _, index = pickup.itemAt(area, tx, ty)
 	if index then
-		audio.play("pickup")
-		self:say(pickup.collect(area, index, p))
+		local def = pickup.collect(area, index, p)
+		if def.quiet then
+			audio.play("coin")
+			self:toast(def.toast)
+		else
+			audio.play("pickup")
+			self:say(def.lines)
+		end
 	end
 	local portal = self:portalAt(tx, ty)
 	if portal then
@@ -209,12 +215,10 @@ end
 
 function Explore:tryUnlock(lock)
 	local p, world = self.player, self.world
-	if lock == "door" and p.keys > 0 then
-		p.keys = p.keys - 1
+	if lock == "door" and p:take("key") then
 		world.unlocked = true
 		self:toast(text.unlocked)
-	elseif lock == "cell" and p.cellKey then
-		p.cellKey = false
+	elseif lock == "cell" and p:take("cellKey") then
 		world.cellOpen = true
 		self:toast(text.cellOpened)
 	else
@@ -255,7 +259,7 @@ function Explore:pressA()
 		end
 		return
 	end
-	if p.hasSword then
+	if p:can("swing") then
 		p:startSwing()
 		self.swingHits = {}
 		audio.play("sword")
@@ -264,7 +268,7 @@ end
 
 function Explore:pressB()
 	local p = self.player
-	if p.hasShield and not p:busy() then
+	if p:can("guard") and not p:busy() then
 		p:startGuard()
 		self.guardPushed = {}
 		audio.play("shield")

@@ -53,10 +53,12 @@ Game.kits = {
 		sword = { 375 },
 		shield = { 184 },
 		heart = { 529 },
+		coin = { 631 },
 	},
 	hud = {
 		heart = { 529 },
 		heartEmpty = { 530 },
+		digits = { 868, 869, 870, 871, 872, 873, 874, 875, 876, 877 },
 	},
 	characters = {
 		player = { 25 },
