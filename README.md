@@ -72,6 +72,8 @@ tools/
   kits.json           tile picks per area kind (edit in the Kit Builder artifact)
   build_kits.py       kits.json + 1-Bit Pack sheet -> 8/16/32px image tables + kits.lua
   build_sounds.py     Kenney sounds -> Playdate WAVs
+  story_check.lua     rolls thousands of worlds and checks each can be finished
+  sim/                headless tests: a Playdate stand-in, a bot that plays a world, unit tests
 assets/               vendored Kenney packs (CC0): 1-Bit Pack, sound effects
 ```
 
@@ -84,8 +86,20 @@ and each module adds itself to the global `Game` table.
 ```
 python3 tools/build_kits.py
 python3 tools/build_sounds.py   # needs ffmpeg
+lua tools/story_check.lua       # after editing data/story.lua or data/objects.lua
 pdc source Roguelike.pdx
 ```
+
+`tools/story_check.lua [count]` (plain Lua 5.4) rolls seeds 1..count (default 5000)
+with the game's own code and checks the Rulebook: four pieces, one gate between
+consecutive acts, the entrance at an end of Act IV, the shield and sword where they
+belong, one chest per area, every object's placeholders filled, and that every world
+can be finished. It prints stats and exits with status 1 on a failure.
+
+`tools/sim/run.sh` runs the headless tests (the story check, unit tests, a stress test
+that builds every area of 500 worlds, and a bot playing 30 worlds). The Playdate uses
+32-bit numbers; `LUA=path/to/lua32 tools/sim/run.sh` runs them on a Lua built with
+`LUA_32BITS` too.
 
 ## Credits
 
