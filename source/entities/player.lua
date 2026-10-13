@@ -136,9 +136,9 @@ function Player:draw(tiles, kits, toScreen)
 	local fx, fy = self:front()
 	local sx, sy = toScreen(fx, fy)
 	if self.swing > 0 then
-		tiles.draw(config.TILE, kits.items.sword[1], sx, sy, self.swordFlip)
+		tiles.draw(config.TILE, Game.itemTile("sword"), sx, sy, self.swordFlip)
 	elseif self.guard > 0 then
-		tiles.draw(config.TILE, kits.items.shield[1], sx, sy, self.flipX and gfx.kImageFlippedX or gfx.kImageUnflipped)
+		tiles.draw(config.TILE, Game.itemTile("shield"), sx, sy, self.flipX and gfx.kImageFlippedX or gfx.kImageUnflipped)
 	end
 end
 

@@ -1,0 +1,23 @@
+{
+  "optional": {"ruinedTown": 0.6, "church": 0.5, "cemetery": 0.6, "creepyForest": 0.6},
+  "features": {
+    "town": {"inside": "house"},
+    "ruinedTown": {"inside": "ruinedHouse", "insideChance": 0.6, "below": {"kind": "cellar", "chance": 0.5, "from": "inside", "cover": "rubble"}, "chest": "deepest"},
+    "church": {"inside": "chapel", "below": {"kind": "crypt", "chance": 0.7, "from": "inside"}, "chest": "inside"},
+    "cemetery": {"below": {"kind": "crypt", "from": "outside", "cover": "grave"}, "chest": "below"},
+    "forest": {"below": {"kind": "cave", "chance": 0.4, "from": "outside", "cover": "web"}, "chest": "below"},
+    "creepyForest": {"below": {"kind": "cave", "from": "outside", "cover": "web"}, "chest": "below"},
+    "ruins": {"below": {"kind": "cellar", "chance": 0.5, "from": "outside", "cover": "rubble"}, "chest": "below"}
+  },
+  "hiddenPassages": 0.35,
+  "connections": [
+    {"between": ["church", "cemetery"]},
+    {"between": ["cemetery", "cemetery"]},
+    {"between": ["ruins", "ruins"]},
+    {"between": ["ruins", "ruinedTown"]},
+    {"between": ["ruinedTown", "ruinedTown"]},
+    {"between": ["forest", "forest"]},
+    {"between": ["forest", "creepyForest"]},
+    {"between": ["creepyForest", "creepyForest"]}
+  ]
+}

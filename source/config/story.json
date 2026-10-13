@@ -1,0 +1,79 @@
+{
+  "acts": [
+    {
+      "name": "Act I: Awakening",
+      "kinds": [
+        ["forest", 1],
+        ["ruins", 0.6],
+        ["camp", 1],
+        ["town", 1],
+        ["church", 0.6],
+        ["cemetery", 0.6]
+      ],
+      "camps": 1,
+      "chests": [
+        { "at": "home", "item": "shield" },
+        { "at": "farthest", "item": "key" },
+        { "at": "rest", "item": "heart" }
+      ]
+    },
+    {
+      "name": "Act II: The Road",
+      "kinds": [
+        ["forest", 1],
+        ["ruins", 1],
+        ["camp", 1],
+        ["town", 1],
+        ["ruinedTown", 1],
+        ["church", 0.5],
+        ["cemetery", 1],
+        ["creepyForest", 0.7]
+      ],
+      "camps": 1,
+      "chests": [
+        { "at": "farthest", "item": "key" },
+        { "at": "any", "item": "sword" },
+        { "at": "rest", "item": "heart" }
+      ]
+    },
+    {
+      "name": "Act III: The Trial",
+      "kinds": [
+        ["forest", 1],
+        ["ruins", 1],
+        ["camp", 1],
+        ["ruinedTown", 1],
+        ["cemetery", 1],
+        ["creepyForest", 1]
+      ],
+      "camps": 1,
+      "chests": [
+        { "at": "farthest", "item": "key" },
+        { "at": "rest", "item": "heart" }
+      ]
+    },
+    {
+      "name": "Act IV: The Dungeon",
+      "chests": [
+        { "at": "entrance", "item": "key" },
+        { "at": "farthest", "item": "cellKey" },
+        { "at": "rest", "item": "heart" }
+      ]
+    }
+  ],
+  "enemies": {
+    "forest": { "min": 1, "max": 2, "chance": 0.4 },
+    "ruins": { "min": 1, "max": 2, "chance": 0.4 },
+    "entrance": { "min": 1, "max": 1 },
+    "dungeon": { "min": 0, "max": 1, "chance": 0.7 },
+    "ruinedTown": { "min": 1, "max": 1 },
+    "cemetery": { "min": 1, "max": 1 },
+    "creepyForest": { "min": 1, "max": 2, "chance": 0.5 },
+    "ruinedHouse": { "min": 0, "max": 1, "chance": 0.5 },
+    "crypt": { "min": 1, "max": 1 },
+    "cave": { "min": 1, "max": 1 },
+    "cellar": { "min": 0, "max": 1, "chance": 0.6 }
+  },
+  "firstAct": 1,
+  "alone": ["sword"]
+}

@@ -1,0 +1,7 @@
+{
+  "maxHearts": 3,
+  "seeds": {},
+  "walkRepeatDelay": 8,
+  "walkRepeatEvery": 5,
+  "effectFrameTime": 4
+}

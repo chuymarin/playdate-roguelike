@@ -1,0 +1,9 @@
+{
+  "order": ["shield", "sword", "key", "cellKey", "coin"],
+  "shield": { "ability": "guard", "lines": "shield" },
+  "sword": { "ability": "swing", "lines": "sword" },
+  "key": { "lines": "key", "consumed": true },
+  "cellKey": { "lines": "cellKey", "consumed": true },
+  "heart": { "lines": "heart", "heart": true },
+  "coin": { "quiet": true, "toast": "coin" }
+}

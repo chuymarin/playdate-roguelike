@@ -32,8 +32,8 @@ local function buildCell(area, ctx, kit)
 	-- the door is an object, not a wall: it blocks the way until it's open
 	layout.set(area, mx, front, nil, false)
 	Game.objects.add(area, "cell", mx, front, {
-		lockedTile = rng.pick(r, kit.cellDoor),
-		openTile = rng.pick(r, kit.cellOpen),
+		lockedTile = rng.pick(r, ctx.kits.objects.cellLocked),
+		openTile = rng.pick(r, ctx.kits.objects.cellOpen),
 	}, "cell:" .. ctx.cell.k)
 	area.reserved[layout.key(mx, front)] = true
 	area.reserved[layout.key(mx + 1, back)] = true
@@ -55,8 +55,8 @@ Game.areaKinds.dungeon = {
 		end
 		helpers.placeChest(area, ctx, anchors)
 
-		helpers.scatter(area, r, 0.14, kit.pillar, true, anchors)
+		helpers.scatter(area, r, 0.14, kit.pillar, Game.walls.dungeon.pillar, anchors)
 		helpers.spawnEnemies(area, r, ctx.cell.enemies, kit.enemy, 2)
-		helpers.scatter(area, r, 0.06, kit.decor, false, anchors)
+		helpers.scatter(area, r, 0.06, kit.decor, Game.walls.dungeon.decor, anchors)
 	end,
 }

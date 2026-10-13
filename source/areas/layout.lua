@@ -104,7 +104,7 @@ end
 -- closed. Any other passage between dungeon and overworld gets a door tile.
 function layout.openings(area, ctx, borderTiles)
 	local cell, world, r = ctx.cell, ctx.world, ctx.r
-	local dungeonKit = ctx.kits.dungeon
+	local dungeonKit, objectKit = ctx.kits.dungeon, ctx.kits.objects
 	for _, d in ipairs(grid.DIRS) do
 		local dir = d[3]
 		if cell.links[dir] then
@@ -114,7 +114,7 @@ function layout.openings(area, ctx, borderTiles)
 			local locked = dungeonDoor or cell.gates[dir] ~= nil
 			local doorTile = nil
 			if locked then
-				doorTile = rng.pick(r, dungeonKit.locked)
+				doorTile = rng.pick(r, dungeonDoor and objectKit.dungeonLocked or objectKit.gateLocked)
 			elseif other and other.dungeon ~= cell.dungeon then
 				doorTile = rng.pick(r, dungeonKit.door)
 			end
@@ -136,7 +136,7 @@ function layout.openings(area, ctx, borderTiles)
 				layout.set(area, c[1], c[2], nil, false)
 				Game.objects.add(area, "gate", c[1], c[2], {
 					lockedTile = doorTile,
-					openTile = rng.pick(r, dungeonKit.door),
+					openTile = rng.pick(r, dungeonDoor and objectKit.dungeonOpen or objectKit.gateOpen),
 					lockedLines = dungeonDoor and Game.text.locked or Game.text.gateLocked,
 				}, "gate:" .. math.min(a, b) .. "-" .. math.max(a, b))
 			end
@@ -223,7 +223,11 @@ end
 
 -- Puts a tile on an empty, unreserved cell. A solid tile is only kept if
 -- every anchor can still reach every other one. Returns true when placed.
+-- solid is true / false, or a set of tiles that are solid (Game.walls).
 function layout.tryPlace(area, x, y, tile, solid, anchors)
+	if type(solid) == "table" then
+		solid = solid[tile] == true
+	end
 	local k = key(x, y)
 	if area.tiles[y][x] ~= nil or area.solid[y][x] or area.reserved[k] or area.occupied[k] or area.spawnTaken[k] or isAnchor(anchors, x, y) then
 		return false
@@ -351,9 +355,10 @@ function layout.carvePath(area, r, from, to, pathTiles)
 	end
 end
 
--- Walkable interior cells with nothing on them, nearest to `from` first.
+-- Walkable interior cells with nothing on them, nearest to `from` first
+-- (reached without walking through a chest or NPC).
 function layout.freeCells(area, from)
-	local _, order = layout.reach(area, from)
+	local _, order = layout.reach(area, from, area.occupied)
 	local out = {}
 	for _, c in ipairs(order) do
 		local x, y = c[1], c[2]

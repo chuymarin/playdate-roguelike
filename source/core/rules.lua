@@ -13,15 +13,18 @@
 --   has    = { "key", "lamp" }   carry each listed item
 --   has    = { coin = 3 }        carry at least that many
 --   status = { [objectId] = s }  that object has that status
+--   is = s                       this object has status s
 --
 -- Effects happen in this fixed order (a Lua table has no key order):
--- take, give, status, drop, sound, toast, say, win. `say` shows its lines
--- and `win` waits for the dialogue to close.
+-- take, give, status, shove, drop, sound, toast, say, win. `say` shows its
+-- lines and `win` waits for the dialogue to close. `shove = true` pushes
+-- the object's cover one cell away from the player (a secret's grave).
 --
 -- ctx is what the rules act on, given by the caller (scenes/explore.lua):
 --   player          has(id, n), give(id), take(id)
 --   statusOf(id)    another object's status, for `status` conditions
---   setStatus(obj, s), drop(item, x, y), sound(name), toast(text),
+--   objectStatus(obj)  this object's status, for `is`
+--   setStatus(obj, s), shove(obj), drop(item, x, y), sound(name), toast(text),
 --   say(lines, onDone), win()
 
 local rules = {}
@@ -39,6 +42,12 @@ local function holds(when, obj, ctx)
 			if not ctx.player:has(id, n) then
 				return false
 			end
+		end
+	end
+	if when.is then
+		local s = ctx.objectStatus and ctx.objectStatus(obj) or ctx.statusOf(obj.id) or obj.initial
+		if s ~= when.is then
+			return false
 		end
 	end
 	if when.status then
@@ -60,6 +69,9 @@ local function apply(does, obj, ctx)
 	end
 	if does.status then
 		ctx.setStatus(obj, does.status)
+	end
+	if does.shove and ctx.shove then
+		ctx.shove(obj)
 	end
 	if does.drop then
 		ctx.drop(does.drop, obj.x, obj.y)

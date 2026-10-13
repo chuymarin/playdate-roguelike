@@ -101,6 +101,10 @@ function objects.draw(area, world, tiles, size, toScreen, withSprites)
 			local px, py = toScreen(obj.x, obj.y)
 			tiles.draw(size, tile, px, py)
 		end
+		if obj.slid and objects.status(world, obj) ~= obj.initial then
+			local px, py = toScreen(obj.slid.x, obj.slid.y)
+			tiles.draw(size, obj.slid.tile, px, py)
+		end
 	end
 end
 

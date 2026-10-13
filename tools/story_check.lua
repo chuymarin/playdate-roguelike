@@ -34,6 +34,7 @@ source = source or (arg[0]:match("^(.*)[/\\]") or ".") .. "/../source"
 
 -- ---------- load the game's world code (no Playdate API needed) ----------
 
+dofile((arg[0]:match("^(.*)[/\\]") or ".") .. "/json.lua")(source)
 Game = {}
 local SKIP = { ["CoreLibs/graphics"] = true, ["tiles/tileset"] = true, ["audio"] = true }
 for line in io.lines(source .. "/main.lua") do
@@ -246,11 +247,14 @@ local function solve(gen)
 	return nil
 end
 
--- Every "{hole}" in a template must be filled in the object.
+-- Every "{hole}" in a template must be filled in the object, except a
+-- status's tile or whether it blocks (an empty Kit Builder slot: not drawn).
 local function holesFilled(template, obj, path)
 	for k, v in pairs(template) do
 		local p = path .. "." .. tostring(k)
-		if type(v) == "string" and v:match("^{%w+}$") then
+		if path:match("%.tiles$") or path:match("%.blocks$") then
+			-- optional
+		elseif type(v) == "string" and v:match("^{%w+}$") then
 			if obj == nil or obj[k] == nil then
 				return p
 			end
@@ -393,13 +397,18 @@ local function checkWorld(seed, withAreas)
 				fail(seed, "error building an area: " .. tostring(area))
 			else
 				local all = { area }
-				if area.house then
-					local okH, house = pcall(world.area, world, "h" .. k)
-					if okH then
-						all[#all + 1] = house
-					else
-						fail(seed, "error building a house: " .. tostring(house))
+				-- its inside and lower level, when there's a way to them
+				local function layer(id)
+					local okL, l = pcall(world.area, world, id)
+					if okL then
+						all[#all + 1] = l
+						return l
 					end
+					fail(seed, "error building " .. id:sub(1, 1) .. " layer: " .. tostring(l))
+				end
+				local inside = area.door and layer("h" .. k)
+				if area.down or (inside and inside.down) then
+					layer("u" .. k)
 				end
 				local chests = 0
 				for _, a in ipairs(all) do

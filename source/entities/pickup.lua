@@ -39,7 +39,7 @@ function pickup.draw(area, tiles, kits, toScreen, size)
 	size = size or config.TILE
 	for _, it in ipairs(area.items) do
 		local px, py = toScreen(it.x, it.y)
-		tiles.draw(size, kits.items[it.item][1], px, py)
+		tiles.draw(size, Game.itemTile(it.item), px, py)
 	end
 end
 

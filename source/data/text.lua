@@ -1,33 +1,6 @@
--- Everything the game says. Each entry is a list of lines; the dialogue box
--- shows one line at a time and Ⓐ moves on. Ⓐ and Ⓑ are the Playdate
--- system font's button glyphs.
+-- Everything the game says: config/text.json. Each entry is a list of
+-- lines (the dialogue box shows one line at a time and Ⓐ moves on) or one
+-- short string (toasts, hint templates where %s is filled in). Ⓐ and Ⓑ
+-- are the Playdate system font's button glyphs.
 
-Game.text = {
-	intro = {
-		"Home, sweet home.",
-		"They say someone is locked up deep in a dungeon, far from here.",
-		"Three locked gates stand in the way.",
-		"Something is waiting in that chest. Face it and press Ⓐ.",
-	},
-	shield = { "You got a shield!", "Hold it up with Ⓑ. It pushes enemies back one step." },
-	sword = { "You got a sword!", "Press Ⓐ to swing it at whatever is in front of you." },
-	key = { "You got a key!", "It opens one locked gate or door." },
-	cellKey = { "You got the cell key!", "Somebody must be locked up down here." },
-	heart = { "A heart container! You can hold one more heart." },
-	locked = { "The dungeon door is locked.", "Its key must be somewhere close by." },
-	gateLocked = { "The gate is locked.", "Its key is hidden somewhere on this side." },
-	faint = { "You fainted...", "You wake up rested, back where you last slept." },
-	cellLocked = { "Help! They locked me in here!", "The guards keep the key in a chest, somewhere in this dungeon." },
-	goal = { "You got me out!", "I've been stuck in that cell for so long. Thank you!" },
-	theEnd = { "The end. Press Ⓐ for a new world." },
-	hintKey = "This region's key is hidden in %s.",
-	hintSword = "Someone left a sword in a chest in %s.",
-	hintGate = "The gate out of this region is %s.",
-	hereTown = "this very town",
-	hereGate = "at the edge of this town",
-	greetings = { "Hello, traveler!", "Oh! A visitor.", "Nice day for a walk, isn't it?", "Mind the monsters out there." },
-	camp = "Rested at camp",
-	coin = "+1 coin",
-	unlocked = "The way is open",
-	cellOpened = "The cell is open",
-}
+Game.text = Game.loadConfig("text")

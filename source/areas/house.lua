@@ -1,5 +1,6 @@
--- House interior: wall border, an exit door in the middle of the bottom
--- wall, furniture along the walls. Home (the start town's house) holds the
+-- House interior: a walled room in the dark (helpers.shapedRoom) with the
+-- door at the end of a short corridor out of the bottom, a table and
+-- chairs, furniture along the walls. Home (the start town's house) holds the
 -- first chest, with the shield; other houses have a villager with hints
 -- about their region: where its key is, where the sword is (until Act II),
 -- and which way the gate out is (Rulebook B.3).
@@ -23,6 +24,8 @@ end
 local PLACE_NAMES = {
 	forest = "the forest", ruins = "the ruins", town = "a town", camp = "a camp",
 	entrance = "the clearing by the dungeon", dungeon = "the dungeon",
+	ruinedTown = "the ruined town", church = "the church", cemetery = "the cemetery",
+	creepyForest = "the dark woods",
 }
 
 -- "the ruins to the north-east", or "this town" for the villager's own cell.
@@ -38,7 +41,12 @@ local function hintLines(ctx, r)
 	local text = Game.text
 	local lines = { rng.pick(r, text.greetings) }
 	if gen.keys and gen.keys[act] then
-		lines[#lines + 1] = text.hintKey:format(where(gen, here, gen.keys[act]))
+		local k = gen.keys[act]
+		lines[#lines + 1] = text.hintKey:format(where(gen, here, k))
+		local below = gen.cells[k].below
+		if below and gen.cells[k].chestAt == "below" and below.cover then
+			lines[#lines + 1] = text["hint_" .. below.cover]
+		end
 	end
 	if gen.sword and act <= gen.cells[gen.sword].act then
 		lines[#lines + 1] = text.hintSword:format(where(gen, here, gen.sword))
@@ -50,30 +58,34 @@ local function hintLines(ctx, r)
 	end
 	return lines
 end
+Game.hintLines = hintLines
 
 Game.areaKinds.house = {
 	build = function(area, ctx)
 		local r, kit = ctx.r, ctx.kits.house
 		area.surface = "wood"
-		area.interior = true
-		layout.border(area, r, kit.wall)
-		local ex = layout.midX(area)[1]
-		layout.set(area, ex, area.rows, rng.pick(r, kit.door), false)
-		local outside = ctx.parent.house
-		area.portals[#area.portals + 1] = { x = ex, y = area.rows, to = ctx.parent.id, toX = outside.frontX, toY = outside.frontY, facing = "S" }
-		area.entry = { ex, area.rows - 1 }
-		area.reserved[layout.key(ex, area.rows - 1)] = true
-		local anchors = { { ex, area.rows }, area.entry }
+		local anchors = helpers.shapedRoom(area, ctx, { shape = "house", walls = kit.wall, exit = kit.door })
 
-		local cells = layout.byCenter(area, layout.freeCells(area, { area.entry }))
+		-- the home chest against a wall, far from the door; a villager near the middle
+		local free = layout.freeCells(area, { area.entry })
 		if ctx.cell.role == "start" then
 			area.home = true
-			local c = helpers.placeSolid(area, cells, anchors)
+			local wall = {}
+			for i = #free, 1, -1 do
+				local c = free[i]
+				for _, d in ipairs(Game.grid.DIRS) do
+					if area.solid[c[2] + d[2]][c[1] + d[1]] then
+						wall[#wall + 1] = c
+						break
+					end
+				end
+			end
+			local c = helpers.placeSolid(area, wall, anchors)
 			if c then
-				Game.objects.add(area, "chest", c[1], c[2], { item = ctx.cell.chest, tile = ctx.kits.items.chest[1] })
+				Game.objects.add(area, "chest", c[1], c[2], { item = ctx.cell.chest, tile = ctx.kits.objects.chestClosed[1], openTile = ctx.kits.objects.chestOpen[1], openBlocks = ctx.kits.objects.chestOpen[1] ~= nil or nil })
 			end
 		else
-			local c = helpers.placeSolid(area, cells, anchors)
+			local c = helpers.placeSolid(area, layout.byCenter(area, free), anchors)
 			if c then
 				Game.objects.add(area, "villager", c[1], c[2], {
 					tile = rng.pick(r, ctx.kits.characters.villager), lines = hintLines(ctx, r),
@@ -81,19 +93,28 @@ Game.areaKinds.house = {
 			end
 		end
 
-		-- furniture: mostly against the top wall, some against the sides
-		for x = 2, area.cols - 1 do
-			if r() < 0.45 then
-				layout.tryPlace(area, x, 2, rng.pick(r, kit.furniture), true, anchors)
-			end
-		end
-		for y = 3, area.rows - 2 do
-			for _, x in ipairs({ 2, area.cols - 1 }) do
-				if r() < 0.3 then
-					layout.tryPlace(area, x, y, rng.pick(r, kit.furniture), true, anchors)
+		-- a table with a chair each side, then furniture along the walls
+		if #kit.table > 0 then
+			for _, c in ipairs(layout.shuffledInterior(area, r)) do
+				local x, y = c[1], c[2]
+				local ok = x > 2 and x < area.cols - 1
+				for dx = -1, 1 do
+					local k = layout.key(x + dx, y)
+					ok = ok and not area.solid[y][x + dx] and area.tiles[y][x + dx] == nil and not area.reserved[k] and not area.occupied[k]
+				end
+				if ok and layout.tryPlace(area, x, y, rng.pick(r, kit.table), Game.walls.house.table, anchors) then
+					for _, dx in ipairs({ -1, 1 }) do
+						layout.tryPlace(area, x + dx, y, rng.pick(r, kit.chair), Game.walls.house.chair, anchors)
+					end
+					break
 				end
 			end
 		end
-		helpers.scatter(area, r, 0.08, kit.floor, false, anchors)
+		for _, c in ipairs(helpers.alongWalls(area, r)) do
+			if r() < 0.45 then
+				layout.tryPlace(area, c[1], c[2], rng.pick(r, kit.furniture), Game.walls.house.furniture, anchors)
+			end
+		end
+		helpers.scatter(area, r, 0.08, kit.floor, Game.walls.house.floor, anchors)
 	end,
 }

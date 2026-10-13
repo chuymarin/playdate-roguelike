@@ -1,5 +1,7 @@
--- Forest and ruins: small mazes. The area's chest (placed by areas/area.lua)
--- ends up in the maze's farthest corner.
+-- Forest, creepy forest and ruins: small mazes. The area's chest ends up
+-- in the maze's farthest corner, or down below when the cell has a lower
+-- level (data/places.lua): a cave behind a web in the border, or a cellar
+-- under rubble you push aside.
 -- Some walls are knocked down (15% of the trees, 30% of the ruin walls,
 -- leaving rubble), which opens loops to run around enemies.
 
@@ -23,6 +25,7 @@ local function build(area, ctx, kit, walls, borderTiles)
 		end
 	end
 	layout.joinOpenings(area)
+	helpers.wayDown(area, ctx, layout.anchors(area))
 	helpers.placeChest(area, ctx)
 	helpers.spawnEnemies(area, r, ctx.cell.enemies, kit.enemy, 1)
 end
@@ -32,7 +35,24 @@ Game.areaKinds.forest = {
 		local kit = ctx.kits.forest
 		area.surface = "grass"
 		build(area, ctx, kit, kit.tree, kit.tree)
-		helpers.scatter(area, ctx.r, 0.12, kit.decor, false, layout.anchors(area))
+		local anchors = layout.anchors(area)
+		if area.down then
+			anchors[#anchors + 1] = { area.down.frontX, area.down.frontY }
+		end
+		helpers.scatter(area, ctx.r, 0.12, kit.decor, Game.walls.forest.decor, anchors)
+	end,
+}
+
+Game.areaKinds.creepyForest = {
+	build = function(area, ctx)
+		local kit = ctx.kits.creepyForest
+		area.surface = "grass"
+		build(area, ctx, kit, kit.tree, kit.tree)
+		local anchors = layout.anchors(area)
+		if area.down then
+			anchors[#anchors + 1] = { area.down.frontX, area.down.frontY }
+		end
+		helpers.scatter(area, ctx.r, 0.14, kit.decor, Game.walls.creepyForest.decor, anchors)
 	end,
 }
 

@@ -14,7 +14,8 @@
 --    leads into the entrance). No other links between pieces.
 -- 6. Kinds: the start town in Act I (the cell farthest from Act I's gate),
 --    the entrance and 3 dungeon rooms in Act IV (the captive in the
---    deepest), the rest rolled per act from data/story.lua.
+--    deepest), the rest rolled per act from data/story.lua, skipping the
+--    optional places (data/places.lua) this world doesn't have.
 --
 -- The chests (what each area holds) are rolled by world/story.lua.
 -- Same algorithm and random sequence as the Room Scale Lab artifact.
@@ -261,10 +262,30 @@ local function farthest(r, cells, from, links)
 end
 worldgen.farthest = farthest
 
-local function rollKind(r, kinds, campsLeft)
+local PLACES_SALT <const> = 13
+
+-- Which optional places (data/places.lua `optional`) this world has, rolled
+-- on a sub-seed so the map's random sequence doesn't shift.
+local function rollPlaces(seed)
+	local r = rng.new(rng.derive(seed, PLACES_SALT))
+	local names = {}
+	local optional = Game.places.optional or {}
+	for name in pairs(optional) do
+		names[#names + 1] = name
+	end
+	table.sort(names) -- pairs' order isn't stable
+	local out = {}
+	for _, name in ipairs(names) do
+		out[name] = r() < optional[name]
+	end
+	return out
+end
+worldgen.rollPlaces = rollPlaces
+
+local function rollKind(r, kinds, campsLeft, places)
 	local total, options = 0, {}
 	for _, entry in ipairs(kinds) do
-		if entry[1] ~= "camp" or campsLeft > 0 then
+		if (entry[1] ~= "camp" or campsLeft > 0) and places[entry[1]] ~= false then
 			options[#options + 1] = entry
 			total = total + entry[2]
 		end
@@ -276,7 +297,7 @@ local function rollKind(r, kinds, campsLeft)
 			return entry[1]
 		end
 	end
-	return options[#options][1]
+	return options[#options] and options[#options][1] or "forest"
 end
 
 -- ---------- the generator ----------
@@ -379,11 +400,12 @@ function worldgen.generate(seed)
 	cells[start].kind = "town"
 	cells[start].role = "start"
 	local acts = Game.story.acts
+	local places = rollPlaces(seed)
 	for act = 1, 3 do
 		local campsLeft = acts[act].camps or 1
 		for _, k in ipairs(actCells[act]) do
 			if not cells[k].kind then
-				local kind = rollKind(r, acts[act].kinds, campsLeft)
+				local kind = rollKind(r, acts[act].kinds, campsLeft, places)
 				if kind == "camp" then
 					campsLeft = campsLeft - 1
 				end
@@ -425,6 +447,7 @@ function worldgen.generate(seed)
 		entrance = entrance,
 		goal = goal,
 		dungeonDoor = { inside = firstRoom, outside = entrance },
+		places = places,
 	}
 end
 

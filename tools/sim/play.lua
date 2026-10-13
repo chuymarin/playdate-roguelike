@@ -117,8 +117,11 @@ local function exitVia(dir)
 end
 
 local function goOutside()
-  local a = E().area
-  if a.interior then walkTo(a.portals[1].x, a.portals[1].y) end
+  for _ = 1, 3 do
+    local a = E().area
+    if not a.interior then return end
+    walkTo(a.portals[1].x, a.portals[1].y)
+  end
 end
 
 local function travel(k)
@@ -150,14 +153,44 @@ local function travel(k)
   return E().area.cell.k == k
 end
 
-local function openChestHere()
+local openChestHere
+-- take a way (a door or stairs): push its secret open first
+local function takeWay(way)
+  local a = E().area
+  for _, sec in ipairs(Game.objects.ofKind(a, "secret")) do
+    if sec.x == way.x and sec.y == way.y and Game.objects.status(E().world, sec) == "hidden" then
+      faceAndA(sec.x, sec.y); shot("secret_" .. a.kind)
+    end
+  end
+  walkTo(way.x, way.y)
+  return E().area ~= a
+end
+-- the chest is inside or below (data/places.lua): go there, open it, come back up
+local function openChestInside()
+  local a = E().area
+  if not a.chestOnward then return end
+  local way = a.cell.chestAt == "below" and a.cell.below.from == "outside" and a.down or a.door
+  if not (way and takeWay(way)) then return end
+  local h = E().area
+  if h.chestOnward and h.down then takeWay(h.down) end
+  openChestHere()
+  goOutside()
+end
+
+function openChestHere()
+  openChestInside()
   local a = E().area
   for _, c in ipairs(Game.objects.ofKind(a, "chest")) do
     if Game.objects.status(E().world, c) == "closed" and E().area == a then
       faceAndA(c.x, c.y)
       shot("chest_open_" .. a.kind)
-      walkTo(c.x, c.y)
-      dismiss()
+      -- the item lands on a free cell next to the chest
+      while #a.items > 0 and E().area == a do
+        local it = a.items[1]
+        walkTo(it.x, it.y)
+        dismiss()
+        if a.items[1] == it then break end
+      end
     end
   end
 end

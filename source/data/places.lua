@@ -1,0 +1,34 @@
+-- How each world is dressed up, after the map is cut into areas
+-- (world/worldgen.lua): config/places.json. Edit it and rebuild the game
+-- (pdc) to change what worlds get; run tools/story_check.lua afterwards to check
+-- every seed can still be finished. Each step rolls on its own sub-seed,
+-- so the same seed always makes the same world.
+--
+-- 1. optional  places that may or may not be in a world, with the chance
+--              each one is (kinds not listed are always there; data/story.lua
+--              says which kinds each act rolls from)
+-- 2. features  what each kind of place gets:
+--      inside   the room you walk into through its building's door
+--      insideChance  how often the building can be entered (default 1;
+--               a ruined house that can't is fallen in)
+--      below    a lower level, reached by stairs down:
+--                 kind    its area kind (areas/interiors.lua)
+--                 chance  how often the place gets stairs down (default 1)
+--                 from    "outside" (stairs in the area itself) or
+--                         "inside" (stairs in its building's room)
+--                 cover   hides the stairs until you walk into it:
+--                         "grave" (pushed aside), "rubble" (pushed aside),
+--                         "web" (torn; the cave mouth is in the area's
+--                         border); none: the stairs are in plain sight
+--      chest    where the area's chest goes: "inside", "below" (when it
+--               has a lower level), "deepest" (below, else inside);
+--               none: out in the open
+-- 3. connections  the lower levels of two neighboring areas of the same
+--              act join (a passage through their walls) when BOTH got
+--              stairs down and their two kinds are listed here
+--              ({"between": [a, b]}, either order), with `chance`
+--              (default 1)
+--    hiddenPassages  the chance a passage is blocked by a secret (a web
+--              between caves, rubble elsewhere) you push away to go on
+
+Game.places = Game.loadConfig("places")

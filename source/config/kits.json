@@ -1,0 +1,589 @@
+{
+  "sheet": "assets/1-bit-pack/monochrome-transparent_packed.png",
+  "tileSize": 16,
+  "columns": 49,
+  "kits": {
+    "town": {
+      "border": [
+        49,
+        51,
+        53,
+        101
+      ],
+      "decor": [
+        5,
+        6,
+        98
+      ],
+      "fence": [
+        148,
+        149
+      ],
+      "path": [
+        2
+      ],
+      "tree": [
+        49,
+        51,
+        52,
+        102
+      ]
+    },
+    "house": {
+      "door": [
+        444
+      ],
+      "floor": [],
+      "furniture": [
+        298,
+        299,
+        346,
+        400,
+        403,
+        397
+      ],
+      "roof": [
+        746
+      ],
+      "wall": [
+        843
+      ],
+      "window": [
+        844
+      ],
+      "table": [
+        394
+      ],
+      "chair": [
+        393
+      ],
+      "roofLeft": [
+        745
+      ],
+      "roofRight": [
+        747
+      ]
+    },
+    "dungeon": {
+      "bars": [
+        152
+      ],
+      "decor": [
+        620,
+        735
+      ],
+      "door": [
+        443
+      ],
+      "enemy": [
+        321,
+        322,
+        418
+      ],
+      "pillar": [
+        588
+      ],
+      "wall": [
+        892,
+        893
+      ]
+    },
+    "forest": {
+      "decor": [
+        5,
+        6,
+        7,
+        98
+      ],
+      "enemy": [
+        270,
+        275,
+        419
+      ],
+      "tree": [
+        49,
+        51,
+        52,
+        53,
+        101,
+        102
+      ]
+    },
+    "ruins": {
+      "enemy": [
+        321,
+        322,
+        323
+      ],
+      "rubble": [
+        735,
+        5,
+        6
+      ],
+      "wall": [
+        637,
+        541,
+        540
+      ]
+    },
+    "camp": {
+      "border": [
+        49,
+        51,
+        101
+      ],
+      "decor": [
+        5,
+        98,
+        620
+      ],
+      "fire": [
+        504
+      ],
+      "tent": [
+        982
+      ]
+    },
+    "items": {
+      "cellKey": [
+        573
+      ],
+      "coin": [
+        523
+      ],
+      "heart": [
+        529
+      ],
+      "key": [
+        571
+      ],
+      "shield": [
+        184,
+        187,
+        137,
+        135
+      ],
+      "sword": [
+        424,
+        380,
+        434,
+        131
+      ]
+    },
+    "hud": {
+      "digits": [
+        868,
+        869,
+        870,
+        871,
+        872,
+        873,
+        874,
+        875,
+        876,
+        877
+      ],
+      "heart": [
+        529
+      ],
+      "heartEmpty": [
+        530
+      ]
+    },
+    "characters": {
+      "goal": [
+        75,
+        76,
+        374
+      ],
+      "player": [
+        25
+      ],
+      "villager": [
+        26,
+        74,
+        76,
+        77,
+        124
+      ],
+      "priest": [
+        127
+      ]
+    },
+    "objects": {
+      "cellLocked": [
+        552
+      ],
+      "cellOpen": [
+        551
+      ],
+      "chestClosed": [
+        302
+      ],
+      "chestOpen": [
+        303
+      ],
+      "dungeonLocked": [
+        441
+      ],
+      "dungeonOpen": [
+        443
+      ],
+      "gateLocked": [
+        441
+      ],
+      "gateOpen": [
+        443
+      ],
+      "remains": [],
+      "web": [
+        737
+      ],
+      "stairsDown": [
+        297
+      ],
+      "stairsUp": [
+        296
+      ]
+    },
+    "effects": {
+      "block": [],
+      "defeat": [
+        735
+      ],
+      "hit": [
+        564
+      ],
+      "hurt": [
+        565
+      ]
+    },
+    "ruinedTown": {
+      "border": [
+        104,
+        98,
+        99
+      ],
+      "tree": [
+        104,
+        98,
+        99
+      ],
+      "rubble": [
+        68,
+        5,
+        6
+      ],
+      "path": [
+        2
+      ],
+      "enemy": [
+        321,
+        322,
+        323
+      ]
+    },
+    "ruinedHouse": {
+      "roof": [
+        594
+      ],
+      "door": [
+        641
+      ],
+      "floor": [
+        68,
+        166
+      ],
+      "furniture": [
+        346,
+        299,
+        400
+      ],
+      "enemy": [
+        321,
+        323
+      ],
+      "roofLeft": [
+        593
+      ],
+      "roofRight": [
+        595
+      ],
+      "wallLeft": [
+        643
+      ],
+      "wallRight": [
+        644
+      ],
+      "overgrown": [
+        5
+      ]
+    },
+    "church": {
+      "roofLeft": [
+        745
+      ],
+      "roofRight": [
+        747
+      ],
+      "steeple": [
+        594
+      ],
+      "window": [
+        590
+      ],
+      "door": [
+        551
+      ],
+      "wall": [
+        843
+      ],
+      "path": [
+        4,
+        2
+      ],
+      "flowers": [
+        7
+      ],
+      "altar": [
+        592
+      ],
+      "candle": [
+        739
+      ],
+      "pew": [
+        393
+      ],
+      "floor": []
+    },
+    "cemetery": {
+      "border": [
+        104,
+        98,
+        99
+      ],
+      "fence": [
+        152
+      ],
+      "grave": [
+        686,
+        687
+      ],
+      "secret": [
+        686,
+        687
+      ],
+      "tree": [
+        104,
+        99
+      ],
+      "decor": [
+        735,
+        5,
+        98
+      ],
+      "enemy": [
+        321,
+        323
+      ]
+    },
+    "crypt": {
+      "wall": [
+        892,
+        893
+      ],
+      "grave": [
+        686,
+        687
+      ],
+      "candle": [
+        738,
+        739
+      ],
+      "decor": [
+        735,
+        620
+      ],
+      "enemy": [
+        321,
+        322,
+        323
+      ]
+    },
+    "creepyForest": {
+      "tree": [
+        104,
+        98,
+        99,
+        100
+      ],
+      "decor": [
+        735,
+        620,
+        5,
+        6
+      ],
+      "enemy": [
+        271,
+        418,
+        419
+      ]
+    },
+    "cave": {
+      "mouth": [
+        450
+      ],
+      "mouthRock": [
+        117
+      ],
+      "rock": [
+        204,
+        205,
+        206
+      ],
+      "decor": [
+        165,
+        166,
+        5
+      ],
+      "enemy": [
+        271,
+        418
+      ]
+    },
+    "build": {
+      "top": [
+        117
+      ],
+      "bottom": [
+        19
+      ],
+      "left": [
+        69
+      ],
+      "right": [
+        67
+      ],
+      "topLeft": [
+        118
+      ],
+      "topRight": [
+        116
+      ],
+      "bottomLeft": [
+        20
+      ],
+      "bottomRight": [
+        18
+      ]
+    }
+  },
+  "walls": {
+    "town": {
+      "tree": [
+        49,
+        51,
+        52,
+        102
+      ],
+      "fence": [
+        148,
+        149
+      ],
+      "decor": []
+    },
+    "house": {
+      "furniture": [
+        298,
+        299,
+        346,
+        400,
+        403,
+        397
+      ],
+      "floor": [],
+      "table": [
+        394
+      ],
+      "chair": []
+    },
+    "dungeon": {
+      "pillar": [
+        588
+      ],
+      "decor": []
+    },
+    "forest": {
+      "decor": []
+    },
+    "camp": {
+      "tent": [
+        982
+      ],
+      "fire": [
+        504
+      ],
+      "decor": [
+        5,
+        98,
+        620
+      ]
+    },
+    "ruinedTown": {
+      "tree": [
+        104,
+        98,
+        99
+      ],
+      "rubble": []
+    },
+    "ruinedHouse": {
+      "furniture": [
+        346,
+        299,
+        400
+      ],
+      "floor": []
+    },
+    "church": {
+      "pew": [
+        393
+      ],
+      "altar": [
+        592
+      ],
+      "candle": [],
+      "floor": []
+    },
+    "cemetery": {
+      "grave": [
+        686,
+        687
+      ],
+      "tree": [
+        104,
+        99
+      ],
+      "decor": []
+    },
+    "crypt": {
+      "grave": [
+        686,
+        687
+      ],
+      "candle": [],
+      "decor": []
+    },
+    "creepyForest": {
+      "decor": []
+    },
+    "cave": {
+      "rock": [
+        204,
+        205,
+        206
+      ],
+      "decor": []
+    }
+  }
+}

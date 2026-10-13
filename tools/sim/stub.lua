@@ -3,6 +3,7 @@
 -- Records draw calls per frame; `frames` holds what was drawn on screen.
 local stub = {}
 local src = assert(SRC, "set SRC")
+dofile((debug.getinfo(1, "S").source:match("^@(.*[/\\])") or "./") .. "../json.lua")(src)
 local loaded = {}
 function import(name)
   if loaded[name] then return nil end
@@ -34,7 +35,7 @@ playdate = {
   graphics = {
     kColorBlack = "black", kColorWhite = "white", kColorClear = "clear",
     kImageUnflipped = "none", kImageFlippedX = "flipX", kImageFlippedY = "flipY", kImageFlippedXY = "flipXY",
-    kDrawModeCopy = "copy", kDrawModeFillWhite = "fillWhite",
+    kDrawModeCopy = "copy", kDrawModeXOR = "xor", kDrawModeFillWhite = "fillWhite",
     imagetable = { new = function(path) local s = tonumber(path:match("tiles(%d+)")); return setmetatable({ size = s }, Table) end },
     image = { new = function(w, h, color) return setmetatable({ list = { { "fill", 0, 0, w, h, color } } }, Canvas) end },
     pushContext = function(img) table.insert(ctxStack, target); target = img end,

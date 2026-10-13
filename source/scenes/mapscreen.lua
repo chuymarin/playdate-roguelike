@@ -80,13 +80,14 @@ function MapScreen:draw()
 		end
 	end
 
-	-- where you are: your tile (or your house door, when inside) and a blinking frame
+	-- where you are: your tile (or the way in, when inside) and a blinking frame
 	local k = here.cell.k
 	local ax, ay = (k % config.MAP) * AREA_W, (k // config.MAP) * AREA_H
 	local outside = world.areas["c" .. k]
 	local px, py = self.explore.player.x, self.explore.player.y
-	if here.interior and outside.house then
-		px, py = outside.house.x, outside.house.y
+	local way = here.interior and (outside.door or outside.down)
+	if way then
+		px, py = way.x, way.y
 	end
 	if (self.frame // 8) % 2 == 0 then
 		gfx.setColor(gfx.kColorWhite)

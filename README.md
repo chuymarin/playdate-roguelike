@@ -49,17 +49,26 @@ two acts' regions meet) and **new world**.
 One world seed builds the map (`world/worldgen.lua`, the same algorithm and random
 sequence as the Room Scale Lab artifact, so a seed shows the same map in both): the
 tiling, the act order, links inside each piece, the gates and each area's kind.
-What each area holds is rolled from the tables in `data/story.lua` on a sub-seed
-(`world/story.lua`). Each area then builds from its own seed derived from the world
-seed; set `config.SEEDS.<kind>` to build every area of a kind from one fixed seed
-while testing.
+What each area holds is rolled from `config/story.json` and `config/places.json`
+on sub-seeds (`world/story.lua`). Each area then builds from its own seed derived
+from the world seed; set `seeds` in `config/settings.json` to build every area of a
+kind from one fixed seed while testing.
+
+## Settings
+
+The game's settings are JSON files in `source/config/`, read at startup: hearts and
+timing (`settings.json`), the acts and enemies (`story.json`), places, insides,
+stairs and underground connections (`places.json`), items (`items.json`), every
+line of text (`text.json`) and the tile picks (`kits.json`, from the Kit Builder).
+Edit one and rebuild with `pdc`; `source/config/README.md` explains every field.
 
 ## Repo structure
 
 ```
 source/
   main.lua            imports every module once, runs the active scene
-  config.lua          screen layout (12x7 rooms of 32px, 16px HUD), seed overrides
+  config.lua          screen layout (12x7 rooms of 32px, 16px HUD), loads config/*.json
+  config/             the settings files (JSON, see config/README.md)
   core/               rng (seeded xorshift), grid helpers, rules (the rule engine)
   world/              worldgen (the 4x4 map), story (what each area holds),
                       objects (object instances and statuses), world (runtime state)
@@ -67,13 +76,13 @@ source/
   entities/           player (and items[]), enemy, npc, pickup (items on the ground)
   ui/                 hud, dialogue
   scenes/             explore (gameplay), mapscreen
-  tiles/              kits.lua (generated), tileset (image tables)
-  data/               text (everything the game says), items (the item table),
-                      objects (object templates and their rules), story (the story tables)
+  tiles/              kits (reads config/kits.json), tileset (image tables)
+  data/               loaders for config/ (text, items, story, places), and
+                      objects (object templates and their rules)
   audio.lua           sound effects
 tools/
-  kits.json           tile picks per area kind (edit in the Kit Builder artifact)
-  build_kits.py       kits.json + 1-Bit Pack sheet -> 8/16/32px image tables + kits.lua
+  build_kits.py       1-Bit Pack sheet -> 8/16/32px image tables; checks config/kits.json
+  json.lua            JSON reader for running the game outside the Playdate
   build_sounds.py     Kenney sounds -> Playdate WAVs
   story_check.lua     rolls thousands of worlds and checks each can be finished
   sim/                headless tests: a Playdate stand-in, a bot that plays a world, unit tests
@@ -87,9 +96,9 @@ and each module adds itself to the global `Game` table.
 ## Build
 
 ```
-python3 tools/build_kits.py
+python3 tools/build_kits.py     # only when the tile sheet changes
 python3 tools/build_sounds.py   # needs ffmpeg
-lua tools/story_check.lua       # after editing data/story.lua or data/objects.lua
+lua tools/story_check.lua       # after editing config/story.json, config/places.json or data/objects.lua
 pdc source Roguelike.pdx
 ```
 

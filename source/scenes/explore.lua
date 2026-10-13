@@ -28,10 +28,12 @@ local rules <const> = Game.rules
 local Explore = {}
 Explore.__index = Explore
 
-local REPEAT_DELAY <const> = 8 -- frames held before walking repeats
-local REPEAT_EVERY <const> = 5
+local REPEAT_DELAY <const> = config.WALK_REPEAT_DELAY -- frames held before walking repeats
+local REPEAT_EVERY <const> = config.WALK_REPEAT_EVERY
 local TOAST_FRAMES <const> = 60
 local BANNER_FRAMES <const> = 100
+local EFFECT_STEP <const> = config.EFFECT_FRAME_TIME -- frames each tile of an effect shows
+local EFFECT_MIN <const> = 10 -- an effect with one tile still shows this long
 local BUTTON_DIRS = {
 	{ pd.kButtonUp, "N" },
 	{ pd.kButtonRight, "E" },
@@ -54,7 +56,7 @@ function Explore.new(world, onWin)
 	}, Explore)
 	self.ctx = self:makeContext()
 	local start = world:area("c" .. world.gen.start)
-	if start.house then
+	if start.door then
 		local home = world:area("h" .. world.gen.start)
 		world.respawn = { id = home.id, x = home.entry[1], y = home.entry[2] }
 	else
@@ -82,6 +84,8 @@ function Explore:enter(id, x, y, facing)
 		self.world.actsSeen[act] = true
 		self.bannerText, self.bannerFrames = Game.story.acts[act].name, BANNER_FRAMES
 	end
+	self.effects = {}
+	self.remains = {} -- { x, y, tile } where enemies fell; gone when you leave
 	self.enemies = {}
 	for i, spawn in ipairs(area.enemySpawns) do
 		local enemy = Game.Enemy.new(spawn)
@@ -100,13 +104,14 @@ function Explore:enter(id, x, y, facing)
 	end
 end
 
--- Leaving through the doorway in direction dir, into the neighbor cell.
+-- Leaving through the doorway in direction dir, into the neighbor cell
+-- (on the same layer: a lower level's passage leads to the neighbor's).
 function Explore:leave(dir)
 	local area, p = self.area, self.player
 	local k = self.world:neighbor(area.cell.k, dir)
 	local x = dir == "E" and 1 or dir == "W" and area.cols or p.x
 	local y = dir == "S" and 1 or dir == "N" and area.rows or p.y
-	self:enter("c" .. k, x, y, dir)
+	self:enter(area.id:sub(1, 1) .. k, x, y, dir)
 end
 
 -- ---------- what's where ----------
@@ -136,6 +141,45 @@ function Explore:portalAt(x, y)
 end
 
 -- Enemies keep to the room's inside: off the border, doors and anything solid.
+-- Where something dropped at (x, y) lands: the free cell nearest to it
+-- that you can walk to (nearest to you on a tie), never the spot itself,
+-- your cell, a doorway or a cell that already holds an item or remains.
+function Explore:dropSpot(x, y)
+	local area, p = self.area, self.player
+	local blocked = {}
+	for _, obj in ipairs(area.objects) do
+		if objects.blocks(self.world, obj) then
+			blocked[layout.key(obj.x, obj.y)] = true
+		end
+	end
+	local taken = {}
+	for _, it in ipairs(area.items) do
+		taken[layout.key(it.x, it.y)] = true
+	end
+	for _, r in ipairs(self.remains) do
+		taken[layout.key(r.x, r.y)] = true
+	end
+	for _, e in ipairs(self.enemies) do
+		taken[layout.key(e.x, e.y)] = true
+	end
+	local dist, order = layout.reach(area, { { p.x, p.y } }, blocked)
+	local best, bestScore
+	for _, c in ipairs(order) do
+		local k = layout.key(c[1], c[2])
+		local near = math.abs(c[1] - x) + math.abs(c[2] - y)
+		if near > 0 and not taken[k] and not (c[1] == p.x and c[2] == p.y) and not self:portalAt(c[1], c[2]) then
+			local score = near * 1000 + dist[k]
+			if not bestScore or score < bestScore then
+				best, bestScore = c, score
+			end
+		end
+	end
+	if best then
+		return best[1], best[2]
+	end
+	return x, y
+end
+
 function Explore:canEnter(x, y, enemy)
 	local area = self.area
 	if x <= 1 or y <= 1 or x >= area.cols or y >= area.rows then
@@ -170,11 +214,18 @@ function Explore:makeContext()
 		statusOf = function(id)
 			return world.status[id]
 		end,
+		objectStatus = function(obj)
+			return objects.status(world, obj)
+		end,
 		setStatus = function(obj, status)
 			objects.setStatus(world, obj, status)
 		end,
+		shove = function(obj)
+			self:shove(obj)
+		end,
 		drop = function(item, x, y)
-			pickup.drop(self.area, item, x, y)
+			local cx, cy = self:dropSpot(x, y)
+			pickup.drop(self.area, item, cx, cy)
 		end,
 		sound = audio.play,
 		toast = function(message)
@@ -190,6 +241,24 @@ function Explore:makeContext()
 	}
 end
 
+-- Pushes a secret's cover (a grave) one cell on, away from the player, if
+-- that cell is free floor; it lies there flat (you can walk over it). The
+-- area keeps it, so it stays pushed aside.
+function Explore:shove(obj)
+	local p, area = self.player, self.area
+	local dx, dy = obj.x - p.x, obj.y - p.y
+	if math.abs(dx) + math.abs(dy) ~= 1 then
+		return
+	end
+	local x, y = obj.x + dx, obj.y + dy
+	local free = x > 1 and y > 1 and x < area.cols and y < area.rows and not area.solid[y][x]
+		and area.tiles[y][x] == nil and not self:objectAt(x, y) and not self:portalAt(x, y)
+		and not pickup.itemAt(area, x, y) and not self:enemyAt(x, y)
+	if free then
+		obj.slid = { x = x, y = y, tile = obj.tiles.hidden }
+	end
+end
+
 -- ---------- player actions ----------
 
 function Explore:tryMove(dir)
@@ -201,7 +270,7 @@ function Explore:tryMove(dir)
 	local d = grid.DELTA[dir]
 	local tx, ty = p.x + d[1], p.y + d[2]
 	if not layout.inside(area, tx, ty) then
-		if not area.interior and area.openings[dir] then
+		if area.openings[dir] then
 			audio.step(area.surface)
 			self:leave(dir)
 		end
@@ -283,11 +352,26 @@ function Explore:push(enemy, dir)
 	enemy:stunFor()
 end
 
+-- A quick effect (kits.effects: hurt, hit, defeat, block) over a cell: its
+-- tiles play in order, drawn inverted so they show over a sprite.
+function Explore:effect(name, x, y)
+	local frames = Game.kits.effects and Game.kits.effects[name]
+	if frames and #frames > 0 then
+		local life = math.max(#frames * EFFECT_STEP, EFFECT_MIN)
+		self.effects[#self.effects + 1] = { frames = frames, x = x, y = y, age = 0, life = life }
+	end
+end
+
 function Explore:hitEnemy(enemy, index)
 	enemy.hp = enemy.hp - 1
 	audio.play("hit")
+	self:effect(enemy.hp <= 0 and "defeat" or "hit", enemy.x, enemy.y)
 	if enemy.hp <= 0 then
 		table.remove(self.enemies, index)
+		local bones = Game.kits.objects.remains
+		if bones and #bones > 0 then
+			self.remains[#self.remains + 1] = { x = enemy.x, y = enemy.y, tile = bones[math.random(#bones)] }
+		end
 		enemy.obj.x, enemy.obj.y = enemy.x, enemy.y
 		rules.fire("defeat", enemy.obj, self.ctx)
 	else
@@ -302,6 +386,7 @@ function Explore:hurtPlayer(enemy)
 		return
 	end
 	audio.play("hurt")
+	self:effect("hurt", p.x, p.y)
 	-- knock the enemy away from the player
 	for _, d in ipairs(grid.DIRS) do
 		if enemy.x - p.x == d[1] and enemy.y - p.y == d[2] then
@@ -325,6 +410,7 @@ function Explore:attack(enemy, dir)
 	local fx, fy = p:front()
 	if p.guard > 0 and fx == enemy.x and fy == enemy.y then
 		audio.play("shield")
+		self:effect("block", fx, fy)
 		self:push(enemy, grid.OPP[dir])
 		return
 	end
@@ -384,6 +470,13 @@ function Explore:update()
 	if self.bannerFrames and self.bannerFrames > 0 then
 		self.bannerFrames = self.bannerFrames - 1
 	end
+	for i = #self.effects, 1, -1 do
+		local e = self.effects[i]
+		e.age = e.age + 1
+		if e.age >= e.life then
+			table.remove(self.effects, i)
+		end
+	end
 	if self.dialogue then
 		if self.dialogue:update() then
 			local done = self.dialogue.onDone
@@ -437,6 +530,10 @@ function Explore:draw()
 	end
 	self.background:draw(0, 0)
 	objects.draw(self.area, self.world, tiles, config.TILE, toScreen)
+	for _, r in ipairs(self.remains) do
+		local px, py = toScreen(r.x, r.y)
+		tiles.draw(config.TILE, r.tile, px, py)
+	end
 	pickup.draw(self.area, tiles, kits, toScreen)
 	for _, n in ipairs(self.npcs) do
 		n:draw(tiles, toScreen)
@@ -445,6 +542,12 @@ function Explore:draw()
 		e:draw(tiles, toScreen)
 	end
 	self.player:draw(tiles, kits, toScreen)
+	gfx.setImageDrawMode(gfx.kDrawModeXOR)
+	for _, e in ipairs(self.effects) do
+		local px, py = toScreen(e.x, e.y)
+		tiles.draw(config.TILE, e.frames[math.min(e.age // EFFECT_STEP + 1, #e.frames)], px, py)
+	end
+	gfx.setImageDrawMode(gfx.kDrawModeCopy)
 	Game.hud.draw(self.player, tiles, kits)
 	if self.toastFrames and self.toastFrames > 0 then
 		local w = gfx.getTextSize(self.toastText) + 16

@@ -32,7 +32,7 @@ function hud.draw(player, tiles, kits)
 	for _, id in ipairs(Game.items.order) do
 		local n = player.items[id]
 		if n and kits.items[id] and kits.items[id][1] then
-			tiles.draw(ICON, kits.items[id][1], x, 0)
+			tiles.draw(ICON, Game.itemTile(id), x, 0)
 			x = x + ICON
 			if n > 1 then
 				x = drawCount(n, x, tiles, kits)

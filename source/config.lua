@@ -1,6 +1,36 @@
--- Game-wide constants. Screen layout: rooms are 12x7 tiles of 32px
--- (384x224), placed 8px in from the sides with a 16px HUD strip on top.
--- The 4x4 map screen shows every area at 8px tiles, 100x60px per area.
+-- Game-wide constants, and the loader for the settings files in config/
+-- (JSON you can edit without touching the code; see config/README.md).
+-- Screen layout: rooms are 12x7 tiles of 32px (384x224), placed 8px in
+-- from the sides with a 16px HUD strip on top. The 4x4 map screen shows
+-- every area at 8px tiles, 100x60px per area.
+
+-- JSON numbers can come back as floats: whole ones become integers (tile
+-- indices, counts), and keys starting with "_" are notes, dropped.
+local function clean(v)
+	if type(v) == "number" then
+		return math.tointeger(v) or v
+	end
+	if type(v) == "table" then
+		local out = {}
+		for k, x in pairs(v) do
+			if not (type(k) == "string" and k:sub(1, 1) == "_") then
+				out[k] = clean(x)
+			end
+		end
+		return out
+	end
+	return v
+end
+
+-- Reads config/<name>.json.
+function Game.loadConfig(name)
+	local path = "config/" .. name .. ".json"
+	local data = json.decodeFile(path)
+	assert(data, "can't read " .. path .. " (is it valid JSON?)")
+	return clean(data)
+end
+
+local settings <const> = Game.loadConfig("settings")
 
 Game.config = {
 	TILE = 32,
@@ -12,12 +42,10 @@ Game.config = {
 
 	MAP = 4,      -- the world is MAP x MAP cells
 
-	MAX_HEARTS = 3,
-
-	-- Seed overrides for testing one kind of area: set e.g. house = 42 and
-	-- every house interior is built from seed 42 (nil = derived from the
-	-- world seed, so each area is different but the same world always
-	-- rebuilds the same way). Kinds: town, house, dungeon, forest, ruins, camp,
-	-- entrance.
-	SEEDS = {},
+	-- from config/settings.json
+	MAX_HEARTS = settings.maxHearts,
+	SEEDS = settings.seeds or {}, -- per area kind: build every one from this seed
+	WALK_REPEAT_DELAY = settings.walkRepeatDelay, -- frames held before walking repeats
+	WALK_REPEAT_EVERY = settings.walkRepeatEvery,
+	EFFECT_FRAME_TIME = settings.effectFrameTime, -- frames each tile of an effect shows
 }

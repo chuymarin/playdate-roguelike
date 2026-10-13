@@ -19,14 +19,14 @@ Game.areaKinds.camp = {
 		local cells = layout.byCenter(area, layout.freeCells(area, anchors))
 		local tent
 		for _, c in ipairs(cells) do
-			if layout.tryPlace(area, c[1], c[2], rng.pick(r, kit.tent), true, anchors) then
+			if layout.tryPlace(area, c[1], c[2], rng.pick(r, kit.tent), Game.walls.camp.tent, anchors) then
 				tent = c
 				break
 			end
 		end
 		if tent then
 			for _, d in ipairs({ { 1, 1 }, { -1, 1 }, { 1, 0 }, { -1, 0 } }) do
-				if layout.tryPlace(area, tent[1] + d[1], tent[2] + d[2], rng.pick(r, kit.fire), true, anchors) then
+				if layout.tryPlace(area, tent[1] + d[1], tent[2] + d[2], rng.pick(r, kit.fire), Game.walls.camp.fire, anchors) then
 					break
 				end
 			end
@@ -35,6 +35,6 @@ Game.areaKinds.camp = {
 		area.respawn = free[1] or anchors[1]
 		area.reserved[layout.key(area.respawn[1], area.respawn[2])] = true
 		helpers.placeChest(area, ctx, anchors)
-		helpers.scatter(area, r, 0.08, kit.decor, true, anchors)
+		helpers.scatter(area, r, 0.08, kit.decor, Game.walls.camp.decor, anchors)
 	end,
 }

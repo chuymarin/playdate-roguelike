@@ -25,7 +25,8 @@ for seed = 1, N do
     count(cell.kind)
     -- doorways all connected (treat chest/NPC cells as blocked)
     local anchors = layout.anchors(a)
-    if a.house then anchors[#anchors + 1] = { a.house.frontX, a.house.frontY } end
+    if a.door then anchors[#anchors + 1] = { a.door.frontX, a.door.frontY } end
+    if a.down then anchors[#anchors + 1] = { a.down.frontX, a.down.frontY } end
     if not layout.connected(a, anchors) then bad("anchors disconnected " .. cell.kind) end
     -- doorway cells must line up with the neighbor's
     for dir in pairs(cell.links) do
@@ -41,9 +42,58 @@ for seed = 1, N do
       return false
     end
     local chests, npcs = Game.objects.ofKind(a, "chest"), Game.objects.ofKind(a, "npc")
+    -- the layers: inside ("h") and lower level ("u")
+    if cell.inside and not a.door then bad("no door " .. cell.kind) end
+    if cell.below and cell.below.from == "outside" and not a.down then bad("no way down " .. cell.kind) end
+    local chestsTotal = #chests
+    local layers = {}
+    local function checkLayer(id)
+      local ok2, h = pcall(world.area, world, id)
+      if not ok2 then bad("layer build error " .. id:sub(1, 1) .. ": " .. tostring(h)) return nil end
+      count(id:sub(1, 1) .. " " .. h.kind)
+      layers[#layers + 1] = h
+      if #h.portals == 0 or not layout.connected(h, { { h.portals[1].x, h.portals[1].y }, h.entry }) then bad("layer exit blocked " .. h.kind) end
+      local hAnchors = layout.anchors(h, { h.entry })
+      if not layout.connected(h, hAnchors) then bad("layer passages cut off " .. h.kind) end
+      local hd = layout.reach(h, { h.entry }, h.occupied)
+      for _, o in ipairs(h.objects) do
+        if o.kind == "chest" or o.kind == "npc" then
+          local s = false
+          for _, d in ipairs(grid.DIRS) do if hd[layout.key(o.x + d[1], o.y + d[2])] then s = true end end
+          if not s then bad(o.kind .. " unreachable in " .. h.kind) end
+        end
+      end
+      local want = id:sub(1, 1) == "h" and (cell.insideEnemies or 0) or (cell.belowEnemies or 0)
+      if cell.role == "start" then want = #h.enemySpawns end
+      if #h.enemySpawns ~= want then bad(("layer enemies %d/%d in %s"):format(#h.enemySpawns, want, h.kind)) end
+      chestsTotal = chestsTotal + #Game.objects.ofKind(h, "chest")
+      if h.kind == "chapel" and #Game.objects.ofKind(h, "npc") ~= 1 then bad("chapel without priest") end
+      return h
+    end
+    local h = a.door and checkLayer("h" .. k)
+    if cell.below and cell.below.from == "inside" and h and not h.down then bad("no stairs down in " .. h.kind) end
+    if a.down or (h and h.down) then
+      local u = checkLayer("u" .. k)
+      if u then
+        for dir in pairs(cell.underLinks or {}) do
+          if not u.openings[dir] then bad("passage missing") end
+          local nb = world:neighbor(k, dir)
+          local okN, un = pcall(world.area, world, "u" .. nb)
+          if not okN then bad("neighbor lower level missing " .. tostring(un)) else
+            local mine, theirs = u.openings[dir][1], un.openings[grid.OPP[dir]][1]
+            if (dir == "N" or dir == "S") and mine[1] ~= theirs[1] or (dir == "E" or dir == "W") and mine[2] ~= theirs[2] then bad("passages misaligned") end
+            if world.gen.cells[nb].act ~= cell.act then bad("passage across acts") end
+          end
+          count("passage")
+        end
+      end
+    end
+    for _, sec in ipairs(Game.objects.ofKind(a, "secret")) do
+      if not (a.down and sec.x == a.down.x and sec.y == a.down.y) then bad("secret not on the way down") end
+    end
+    if cell.chest and cell.role ~= "start" and chestsTotal ~= 1 then bad(("chests %d in %s"):format(chestsTotal, cell.kind)) end
     for _, c in ipairs(chests) do if not standable(c.x, c.y) then bad("chest unreachable " .. cell.kind) end end
     for _, n in ipairs(npcs) do if n.template ~= "captive" and not standable(n.x, n.y) then bad("npc unreachable " .. cell.kind) end end
-    if cell.chest and cell.role ~= "start" and #chests ~= 1 then bad("chest missing " .. cell.kind) end
     if cell.role == "goal" and #npcs ~= 1 then bad("goal npc missing") end
     if #a.enemySpawns ~= cell.enemies then bad(("enemies %d/%d in %s"):format(#a.enemySpawns, cell.enemies, cell.kind)) end
     for _, s in ipairs(a.enemySpawns) do

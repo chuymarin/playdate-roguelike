@@ -15,9 +15,9 @@ Game.areaKinds.entrance = {
 		layout.addHub(area)
 		local anchors = layout.anchors(area)
 		helpers.placeChest(area, ctx, anchors)
-		helpers.scatter(area, r, 0.10, kits.dungeon.pillar, true, anchors)
+		helpers.scatter(area, r, 0.10, kits.dungeon.pillar, Game.walls.dungeon.pillar, anchors)
 		helpers.scatter(area, r, 0.08, kits.forest.tree, true, anchors)
 		helpers.spawnEnemies(area, r, ctx.cell.enemies, kits.forest.enemy, 1)
-		helpers.scatter(area, r, 0.08, kits.forest.decor, false, anchors)
+		helpers.scatter(area, r, 0.08, kits.forest.decor, Game.walls.forest.decor, anchors)
 	end,
 }
