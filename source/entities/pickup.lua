@@ -1,22 +1,12 @@
--- Chests and items. A chest doesn't show what it holds: facing it and
--- pressing Ⓐ makes it disappear and leaves its item on that tile, and
--- walking onto an item picks it up.
+-- Items on the ground (Rulebook 3.3). An opened chest (or a defeated enemy)
+-- drops its item on its tile, and walking onto an item picks it up.
 --
--- Chests and items live in the area (area.chests / area.items), so an
--- opened chest stays open and a dropped item stays where it was.
+-- Items live in the area (area.items), so a dropped item stays where it
+-- fell until you take it.
 
 local config <const> = Game.config
 
 local pickup = {}
-
-function pickup.chestAt(area, x, y)
-	for _, c in ipairs(area.chests) do
-		if not c.opened and c.x == x and c.y == y then
-			return c
-		end
-	end
-	return nil
-end
 
 function pickup.itemAt(area, x, y)
 	for i, it in ipairs(area.items) do
@@ -27,9 +17,8 @@ function pickup.itemAt(area, x, y)
 	return nil
 end
 
-function pickup.open(area, chest)
-	chest.opened = true
-	area.items[#area.items + 1] = { x = chest.x, y = chest.y, item = chest.contents }
+function pickup.drop(area, item, x, y)
+	area.items[#area.items + 1] = { x = x, y = y, item = item }
 end
 
 -- Gives the item to the player and removes it from the area. Returns the
@@ -48,12 +37,6 @@ end
 
 function pickup.draw(area, tiles, kits, toScreen, size)
 	size = size or config.TILE
-	for _, c in ipairs(area.chests) do
-		if not c.opened then
-			local px, py = toScreen(c.x, c.y)
-			tiles.draw(size, kits.items.chest[1], px, py)
-		end
-	end
 	for _, it in ipairs(area.items) do
 		local px, py = toScreen(it.x, it.y)
 		tiles.draw(size, kits.items[it.item][1], px, py)

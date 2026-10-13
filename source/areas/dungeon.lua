@@ -28,15 +28,16 @@ local function buildCell(area, ctx, kit)
 	bars(mx - 1, front)
 	bars(mx + 1, front)
 	bars(mx + 2, front)
-	-- the door isn't solid: the explore scene blocks it until it's unlocked
+	-- the door is an object, not a wall: it blocks the way until it's open
 	layout.set(area, mx, front, nil, false)
-	area.cellLock = { x = mx, y = front, tile = rng.pick(r, kit.cellDoor), openTile = rng.pick(r, kit.cellOpen) }
+	Game.objects.add(area, "cell", mx, front, {
+		lockedTile = rng.pick(r, kit.cellDoor),
+		openTile = rng.pick(r, kit.cellOpen),
+	}, "cell:" .. ctx.cell.k)
 	area.reserved[layout.key(mx, front)] = true
 	area.reserved[layout.key(mx + 1, back)] = true
 	area.occupied[layout.key(mx, back)] = true
-	area.npcs[#area.npcs + 1] = {
-		x = mx, y = back, tile = rng.pick(r, ctx.kits.characters.goal), lines = Game.text.goal, goal = true,
-	}
+	Game.objects.add(area, "captive", mx, back, { tile = rng.pick(r, ctx.kits.characters.goal) })
 end
 
 Game.areaKinds.dungeon = {
@@ -60,7 +61,7 @@ Game.areaKinds.dungeon = {
 			end
 			local c = helpers.placeSolid(area, far, anchors)
 			if c then
-				area.chests[#area.chests + 1] = { x = c[1], y = c[2], contents = ctx.cell.chest }
+				Game.objects.add(area, "chest", c[1], c[2], { item = ctx.cell.chest, tile = ctx.kits.items.chest[1] })
 			end
 		end
 

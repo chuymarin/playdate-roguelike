@@ -1,12 +1,17 @@
 -- The main scene: walking around one area at a time.
 --
--- Controls: d-pad moves one tile (hold to keep walking). Ⓐ opens the chest
--- or talks to the NPC in front of you, otherwise swings the sword (once you
--- have it). Ⓑ raises the shield (once you have it).
+-- Controls: d-pad moves one tile (hold to keep walking). Ⓐ uses the object
+-- in front of you (opens a chest, talks to an NPC), otherwise swings the
+-- sword (once you have it). Ⓑ raises the shield (once you have it).
+--
+-- Every interaction goes through the objects' rules (core/rules.lua): Ⓐ
+-- fires `use` on the object in front, walking into one fires `bump`, and an
+-- enemy at 0 hit points fires `defeat`. This scene only provides what the
+-- rules act on (makeContext).
 --
 -- Walking off a doorway at the room's edge enters the next area; walking
 -- onto a house door goes inside. Enemies come back each time you enter an
--- area; opened chests and picked-up items don't.
+-- area; opened chests and gates and picked-up items don't.
 
 local gfx <const> = playdate.graphics
 local pd <const> = playdate
@@ -17,6 +22,8 @@ local pickup <const> = Game.pickup
 local audio <const> = Game.audio
 local tiles <const> = Game.tiles
 local text <const> = Game.text
+local objects <const> = Game.objects
+local rules <const> = Game.rules
 
 local Explore = {}
 Explore.__index = Explore
@@ -44,6 +51,7 @@ function Explore.new(world, onWin)
 		held = nil,
 		heldFrames = 0,
 	}, Explore)
+	self.ctx = self:makeContext()
 	local start = world:area("c" .. world.gen.start)
 	if start.house then
 		local home = world:area("h" .. world.gen.start)
@@ -68,12 +76,14 @@ function Explore:enter(id, x, y, facing)
 	p.swing, p.guard = 0, 0
 	self.world.visited[area.cell.k] = true
 	self.enemies = {}
-	for _, spawn in ipairs(area.enemySpawns) do
-		self.enemies[#self.enemies + 1] = Game.Enemy.new(spawn)
+	for i, spawn in ipairs(area.enemySpawns) do
+		local enemy = Game.Enemy.new(spawn)
+		enemy.obj = objects.new("enemy", "enemy:" .. area.id .. ":" .. i, spawn.x, spawn.y)
+		self.enemies[#self.enemies + 1] = enemy
 	end
 	self.npcs = {}
-	for _, def in ipairs(area.npcs) do
-		self.npcs[#self.npcs + 1] = Game.Npc.new(def)
+	for _, obj in ipairs(objects.ofKind(area, "npc")) do
+		self.npcs[#self.npcs + 1] = Game.Npc.new(obj)
 	end
 	self.background = nil
 	if area.safe then
@@ -94,34 +104,16 @@ end
 
 -- ---------- what's where ----------
 
--- The closed lock at (x, y), if any: "door" (the dungeon entrance, opened
--- with the dungeon key) or "cell" (the NPC's cell, opened with the cell key).
-function Explore:lockAt(x, y)
-	local area, world = self.area, self.world
-	local lock = area.lock
-	if lock and not world.unlocked and lock.x == x and lock.y == y then
-		return "door"
-	end
-	lock = area.cellLock
-	if lock and not world.cellOpen and lock.x == x and lock.y == y then
-		return "cell"
-	end
-	return nil
+-- The object blocking (x, y), if any: a closed chest, a locked gate or
+-- cell door, an NPC.
+function Explore:objectAt(x, y)
+	return objects.at(self.area, self.world, x, y)
 end
 
 function Explore:enemyAt(x, y)
 	for i, e in ipairs(self.enemies) do
 		if e.x == x and e.y == y then
 			return e, i
-		end
-	end
-	return nil
-end
-
-function Explore:npcAt(x, y)
-	for _, n in ipairs(self.npcs) do
-		if n.x == x and n.y == y then
-			return n
 		end
 	end
 	return nil
@@ -142,7 +134,7 @@ function Explore:canEnter(x, y, enemy)
 	if x <= 1 or y <= 1 or x >= area.cols or y >= area.rows then
 		return false
 	end
-	if area.solid[y][x] or self:portalAt(x, y) or pickup.chestAt(area, x, y) or self:npcAt(x, y) or self:lockAt(x, y) then
+	if area.solid[y][x] or self:portalAt(x, y) or self:objectAt(x, y) then
 		return false
 	end
 	local other = self:enemyAt(x, y)
@@ -162,6 +154,35 @@ function Explore:toast(message)
 	self.toastText, self.toastFrames = message, TOAST_FRAMES
 end
 
+-- ---------- what rules act on ----------
+
+function Explore:makeContext()
+	local world = self.world
+	return {
+		player = self.player,
+		statusOf = function(id)
+			return world.status[id]
+		end,
+		setStatus = function(obj, status)
+			objects.setStatus(world, obj, status)
+		end,
+		drop = function(item, x, y)
+			pickup.drop(self.area, item, x, y)
+		end,
+		sound = audio.play,
+		toast = function(message)
+			self:toast(message)
+		end,
+		say = function(lines, onDone)
+			self:say(lines, onDone)
+		end,
+		win = function()
+			audio.play("win")
+			self:say(text.theEnd, self.onWin)
+		end,
+	}
+end
+
 -- ---------- player actions ----------
 
 function Explore:tryMove(dir)
@@ -179,12 +200,12 @@ function Explore:tryMove(dir)
 		end
 		return
 	end
-	local lock = self:lockAt(tx, ty)
-	if lock then
-		self:tryUnlock(lock)
+	local obj = self:objectAt(tx, ty)
+	if obj then
+		rules.fire("bump", obj, self.ctx)
 		return
 	end
-	if area.solid[ty][tx] or pickup.chestAt(area, tx, ty) or self:npcAt(tx, ty) then
+	if area.solid[ty][tx] then
 		return
 	end
 	local enemy = self:enemyAt(tx, ty)
@@ -195,8 +216,12 @@ function Explore:tryMove(dir)
 	p.x, p.y = tx, ty
 	audio.step(area.surface)
 
-	local _, index = pickup.itemAt(area, tx, ty)
-	if index then
+	-- everything lying here (an enemy can drop a coin onto another item)
+	while true do
+		local _, index = pickup.itemAt(area, tx, ty)
+		if not index then
+			break
+		end
 		local def = pickup.collect(area, index, p)
 		if def.quiet then
 			audio.play("coin")
@@ -213,50 +238,14 @@ function Explore:tryMove(dir)
 	end
 end
 
-function Explore:tryUnlock(lock)
-	local p, world = self.player, self.world
-	if lock == "door" and p:take("key") then
-		world.unlocked = true
-		self:toast(text.unlocked)
-	elseif lock == "cell" and p:take("cellKey") then
-		world.cellOpen = true
-		self:toast(text.cellOpened)
-	else
-		audio.play("locked")
-		self:say(lock == "door" and text.locked or text.cellLocked)
-		return
-	end
-	self.background = nil
-	audio.play("unlock")
-end
-
 function Explore:pressA()
-	local p, area = self.player, self.area
+	local p = self.player
 	if p:busy() then
 		return
 	end
 	local fx, fy = p:front()
-	local chest = pickup.chestAt(area, fx, fy)
-	if chest then
-		pickup.open(area, chest)
-		audio.play("chest")
-		return
-	end
-	local lock = self:lockAt(fx, fy)
-	if lock then
-		self:tryUnlock(lock)
-		return
-	end
-	local npc = self:npcAt(fx, fy)
-	if npc then
-		if npc.def.goal then
-			self:say(npc.def.lines, function()
-				audio.play("win")
-				self:say(text.theEnd, self.onWin)
-			end)
-		else
-			self:say(npc.def.lines)
-		end
+	local obj = self:objectAt(fx, fy)
+	if obj and rules.fire("use", obj, self.ctx) then
 		return
 	end
 	if p:can("swing") then
@@ -292,6 +281,8 @@ function Explore:hitEnemy(enemy, index)
 	audio.play("hit")
 	if enemy.hp <= 0 then
 		table.remove(self.enemies, index)
+		enemy.obj.x, enemy.obj.y = enemy.x, enemy.y
+		rules.fire("defeat", enemy.obj, self.ctx)
 	else
 		enemy.flash = 12
 		self:push(enemy, self.player.facing)
@@ -410,7 +401,8 @@ function Explore:update()
 	end
 end
 
--- The room's tiles, drawn once into an image (again after a lock opens).
+-- The room's tiles, drawn once into an image. Objects (chests, gates,
+-- cell doors) change with their status, so they're drawn every frame.
 function Explore:renderBackground()
 	local area = self.area
 	local image = gfx.image.new(400, 240, gfx.kColorBlack)
@@ -418,12 +410,6 @@ function Explore:renderBackground()
 	for y = 1, area.rows do
 		for x = 1, area.cols do
 			local tile = area.tiles[y][x]
-			if area.lock and area.lock.x == x and area.lock.y == y then
-				tile = self.world.unlocked and area.lock.openTile or area.lock.tile
-			end
-			if area.cellLock and area.cellLock.x == x and area.cellLock.y == y then
-				tile = self.world.cellOpen and area.cellLock.openTile or area.cellLock.tile
-			end
 			if tile then
 				local px, py = toScreen(x, y)
 				tiles.draw(config.TILE, tile, px, py)
@@ -440,6 +426,7 @@ function Explore:draw()
 		self.background = self:renderBackground()
 	end
 	self.background:draw(0, 0)
+	objects.draw(self.area, self.world, tiles, config.TILE, toScreen)
 	pickup.draw(self.area, tiles, kits, toScreen)
 	for _, n in ipairs(self.npcs) do
 		n:draw(tiles, toScreen)

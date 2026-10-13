@@ -34,7 +34,7 @@ local function build(area, ctx, kit, walls, borderTiles)
 		end
 		local c = helpers.placeSolid(area, far, anchors)
 		if c then
-			area.chests[#area.chests + 1] = { x = c[1], y = c[2], contents = ctx.cell.chest }
+			Game.objects.add(area, "chest", c[1], c[2], { item = ctx.cell.chest, tile = ctx.kits.items.chest[1] })
 		end
 	end
 	helpers.spawnEnemies(area, r, ctx.cell.enemies, kit.enemy, 1)

@@ -27,9 +27,8 @@ function layout.new(id, kind, cols, rows)
 		reserved = {}, -- [key] cells kept clear (paths, spots in front of doors)
 		openings = {}, -- [dir] = list of { x, y } border cells open toward a neighbor
 		portals = {},  -- { x, y, to = area id, toX, toY, facing }
-		chests = {},   -- { x, y, contents, opened }
+		objects = {},  -- chests, gates, cells, NPCs (world/objects.lua)
 		items = {},    -- { x, y, item } lying on the ground
-		npcs = {},     -- { x, y, tile, lines, goal }
 		enemySpawns = {}, -- { x, y, tile, hp }
 		occupied = {}, -- [key] cells taken by a chest or NPC (they block the way)
 		spawnTaken = {}, -- [key] enemy spawn cells (enemies move, so they don't block)
@@ -99,9 +98,9 @@ local function inward(c, dir)
 end
 
 -- Opens the border toward each linked neighbor. The dungeon's locked
--- entrance gets a lock tile on its first cell (area.lock; walkable once the
--- world is unlocked) and closes the rest of that gap; any other passage
--- between dungeon and overworld gets a door tile.
+-- entrance gets a gate object on its first cell (one id for both sides, so
+-- opening it from one side opens it on the other) and closes the rest of
+-- that gap; any other passage between dungeon and overworld gets a door tile.
 function layout.openings(area, ctx, borderTiles)
 	local cell, world, r = ctx.cell, ctx.world, ctx.r
 	local dungeonKit = ctx.kits.dungeon
@@ -131,7 +130,13 @@ function layout.openings(area, ctx, borderTiles)
 			end
 			if locked then
 				local c = cells[1]
-				area.lock = { x = c[1], y = c[2], tile = doorTile, openTile = rng.pick(r, dungeonKit.door) }
+				local a, b = cell.k, other.k
+				layout.set(area, c[1], c[2], nil, false)
+				Game.objects.add(area, "gate", c[1], c[2], {
+					lockedTile = doorTile,
+					openTile = rng.pick(r, dungeonKit.door),
+					lockedLines = Game.text.locked,
+				}, "gate:" .. math.min(a, b) .. "-" .. math.max(a, b))
 			end
 		end
 	end

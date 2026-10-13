@@ -54,14 +54,14 @@ Game.areaKinds.house = {
 			area.home = true
 			local c = helpers.placeSolid(area, cells, anchors)
 			if c then
-				area.chests[#area.chests + 1] = { x = c[1], y = c[2], contents = "shield" }
+				Game.objects.add(area, "chest", c[1], c[2], { item = "shield", tile = ctx.kits.items.chest[1] })
 			end
 		else
 			local c = helpers.placeSolid(area, cells, anchors)
 			if c then
-				area.npcs[#area.npcs + 1] = {
-					x = c[1], y = c[2], tile = rng.pick(r, ctx.kits.characters.villager), lines = hintLines(ctx, r),
-				}
+				Game.objects.add(area, "villager", c[1], c[2], {
+					tile = rng.pick(r, ctx.kits.characters.villager), lines = hintLines(ctx, r),
+				})
 			end
 		end
 

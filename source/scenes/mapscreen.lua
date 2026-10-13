@@ -40,15 +40,13 @@ function MapScreen:draw()
 			for y = 1, area.rows do
 				for x = 1, area.cols do
 					local tile = area.tiles[y][x]
-					if area.lock and area.lock.x == x and area.lock.y == y then
-						tile = world.unlocked and area.lock.openTile or area.lock.tile
-					end
 					if tile then
 						local px, py = toMap(x, y)
 						tiles.draw(SMALL, tile, px, py)
 					end
 				end
 			end
+			Game.objects.draw(area, world, tiles, SMALL, toMap, true)
 			pickup.draw(area, tiles, Game.kits, toMap, SMALL)
 		end
 	end
