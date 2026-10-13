@@ -1,10 +1,30 @@
 # playdate-roguelike (working title)
 
-A tiny Zelda-like for the Playdate. Every world is a random 4x4 map of 12 areas:
-a town (your home is here), forest and ruins mazes, camps, and a locked dungeon
-where someone is waiting for you.
+A tiny Zelda-like for the Playdate where every seed tells a different short
+story. You are a hero, and you need to achieve something. The story comes
+in **four acts**, and each act opens a new part of the world.
 
-## How a run goes
+The full rules are in **[the Rulebook](docs/RULEBOOK.md)**: how the world is
+built, what every object does, and the tables the story is rolled from.
+
+## The design in short
+
+- The world is a **4x4 map** of 16 areas (one screen each), cut into four
+  **tetromino pieces** (I, O, T, L/J, S/Z). There are 117 ways to cut it.
+- Each piece is one **act's region**. Act I's piece is open from the start.
+  A **gate** opens the next act's piece, and regions you've opened stay open.
+- Inside a piece the areas are linked as a path, a T, or (for an O) a loop or a U.
+- Act IV is 1 dungeon entrance plus 3 dungeon rooms, with the captive in the deepest one.
+- Every area has a chest. In each act one chest holds the key to the next gate.
+- Everything you interact with is an **object** with a status (`closed`/`open`...)
+  and **rules**: *trigger → conditions → effects* (`on use, when has key: take key, open`).
+  What you carry is `items[]`.
+
+Work toward this is tracked in the repo's GitHub issues.
+
+## How the current build plays
+
+The code doesn't have the act system yet. Today a run goes like this:
 
 1. You start at home. The chest there holds a **shield** (Ⓑ: block; pushes an enemy back one tile).
 2. Out in the world, maze areas hide closed chests. Face one and press Ⓐ: the chest
@@ -18,7 +38,7 @@ where someone is waiting for you.
 
 System menu: **map** (the areas you've visited, at 8px per tile) and **new world**.
 
-## World generation
+## World generation (current build)
 
 One world seed builds the map (`world/worldgen.lua`, the same algorithm and random
 sequence as the Room Scale Lab artifact, so a seed shows the same map in both).
