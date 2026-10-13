@@ -148,9 +148,14 @@ item is one row of the item table:
 | key | Opens one gate or locked door. | yes |
 | cell key | Opens the captive's cell. | yes |
 | heart | One more heart to hold, and refills them all. | (taken at once) |
+| coin | Dropped by enemies. **(v1)** Only counted; what coins buy comes later. | — |
 
 **Rule 3.1.2.** An **ability item** changes what a button does. Any other
 item only matters to conditions (Chapter 5).
+
+**Rule 3.1.3. (v1)** The **shield** is found in Act I and the **sword** in Act II.
+Act I is played with the shield only: push enemies away, don't fight them.
+New items and new ways to use them come in later updates.
 
 ### 3.2 Objects
 **Rule 3.2.1.** Everything you can interact with is an **object**. An object
@@ -202,6 +207,10 @@ and makes it your rest spot.
 ### 4.4 Enemies
 **Rule 4.4.1.** Outdoor enemies take 1 hit, dungeon enemies take 2. A hit
 pushes an enemy back a tile and stuns it for a moment.
+
+**Rule 4.4.2. (v1)** All enemies of an area look alike; nothing marks one as
+special. Every defeated enemy **drops a coin** on its tile. Enemies come back
+when you re-enter an area, so coins can be farmed. That's fine until coins buy something.
 
 ### 4.5 Winning
 **Rule 4.5.1. (v1)** Open the captive's cell and talk to them. The story ends,
@@ -277,6 +286,9 @@ cell    = { status = "locked",
             rules = { { on = "bump", when = { has = { "cellKey" } },
                         does = { take = "cellKey", status = "open" },
                         otherwise = { say = { "Help! The guards keep the key in a chest." } } } } }
+
+enemy   = { kind = "enemy", status = "alive",
+            rules = { { on = "defeat", does = { status = "defeated", drop = "coin" } } } }
 
 captive = { kind = "npc", status = "waiting",
             rules = { { on = "use", does = { say = { "You got me out!" }, win = true } } } }
@@ -377,6 +389,7 @@ and the sword are.
 | **Effect** | What a rule does: give, take, drop, change status, say, win. |
 | **Gate** | The one passage between an act's region and the next. Blocked until its condition holds. |
 | **Goal** | How the story ends. |
+| **Coin** | What every defeated enemy drops (v1). Counted, not yet spent. |
 | **Item** | Anything the hero carries. Ability items change what a button does. |
 | **Loot carrier** | An enemy that drops an item the story needs. |
 | **Object** | Anything you interact with: chest, gate, cell, NPC, enemy. Has a status and rules. |
@@ -391,9 +404,12 @@ and the sword are.
 
 ## Appendix D: Open questions
 
-- Should the sword be found in Act I instead of Act II? (v1 puts it in II,
-  so Act I is shield-only.)
-- Should a loot carrier look different from other enemies, or be hidden?
+Settled for v1:
+- Shield in Act I, sword in Act II (Rule 3.1.3).
+- Enemies all look the same and drop coins (Rule 4.4.2). Loot carriers come later.
+
+Still open:
+- What coins buy (a shop, a trade, a toll gate?).
 - Flags ("talked to the mayor") or items only? Items only is simpler: a
   beaten boss can drop a crown.
 - Act names are working titles.
