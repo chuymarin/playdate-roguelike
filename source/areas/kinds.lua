@@ -59,6 +59,35 @@ function helpers.spawnEnemies(area, r, count, tiles, hp)
 	end
 end
 
+-- The area's chest (Rulebook B.1), the one step every kind shares: on the
+-- free cell farthest from the doorways that keeps every doorway (and a
+-- house door) reachable. Kinds call it before scattering trees and decor,
+-- so there's always room. Outdoors, the start town has no chest: its chest
+-- is in the home. Pass the builder's anchors so the spot in front of the
+-- chest is added to them and later scattering can't wall it off.
+function helpers.placeChest(area, ctx, anchors)
+	local cell = ctx.cell
+	if not cell.chest or (area.kind ~= "house" and cell.role == "start") then
+		return nil
+	end
+	if not anchors then
+		anchors = layout.anchors(area)
+		if area.house then
+			anchors[#anchors + 1] = { area.house.frontX, area.house.frontY }
+		end
+	end
+	local cells = layout.freeCells(area, anchors)
+	local far = {}
+	for i = #cells, 1, -1 do
+		far[#far + 1] = cells[i]
+	end
+	local c = helpers.placeSolid(area, far, anchors)
+	if c then
+		Game.objects.add(area, "chest", c[1], c[2], { item = ctx.cell.chest, tile = ctx.kits.items.chest[1] })
+	end
+	return c
+end
+
 -- Scatters tiles over free interior cells with the given chance each.
 function helpers.scatter(area, r, chance, tiles, solid, anchors)
 	if #tiles == 0 then

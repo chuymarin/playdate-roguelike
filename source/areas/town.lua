@@ -84,6 +84,7 @@ Game.areaKinds.town = {
 			end
 		end
 
+		helpers.placeChest(area, ctx, anchors)
 		helpers.scatter(area, r, 0.16, kit.tree, true, anchors)
 		helpers.scatter(area, r, 0.10, kit.decor, false, anchors)
 	end,

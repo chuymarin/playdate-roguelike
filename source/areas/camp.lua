@@ -34,6 +34,7 @@ Game.areaKinds.camp = {
 		local free = layout.byCenter(area, layout.freeCells(area, anchors))
 		area.respawn = free[1] or anchors[1]
 		area.reserved[layout.key(area.respawn[1], area.respawn[2])] = true
+		helpers.placeChest(area, ctx, anchors)
 		helpers.scatter(area, r, 0.08, kit.decor, true, anchors)
 	end,
 }

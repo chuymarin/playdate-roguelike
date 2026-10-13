@@ -11,13 +11,13 @@ Game.config = {
 	HUD_HEIGHT = 16,
 
 	MAP = 4,      -- the world is MAP x MAP cells
-	AREAS = 12,   -- of which this many hold an area (the rest stay blank)
 
 	MAX_HEARTS = 3,
 
 	-- Seed overrides for testing one kind of area: set e.g. house = 42 and
 	-- every house interior is built from seed 42 (nil = derived from the
 	-- world seed, so each area is different but the same world always
-	-- rebuilds the same way). Kinds: town, house, dungeon, forest, ruins, camp.
+	-- rebuilds the same way). Kinds: town, house, dungeon, forest, ruins, camp,
+	-- entrance.
 	SEEDS = {},
 }

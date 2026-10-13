@@ -6,6 +6,7 @@
 local rng = {}
 
 local MASK <const> = 0xffffffff
+local WARMUP <const> = 4
 
 -- Returns a function giving numbers in [0, 1).
 function rng.new(seed)
@@ -13,7 +14,7 @@ function rng.new(seed)
 	if s == 0 then
 		s = 1
 	end
-	return function()
+	local function next()
 		s = (s ~ (s << 13)) & MASK
 		-- The lab's JavaScript shifts right with sign extension (its `>>` works
 		-- on signed 32-bit numbers), so the top bit is copied down here too.
@@ -28,6 +29,13 @@ function rng.new(seed)
 		-- s / 2^32 can round up to 1.0 as a float. 24 bits fit a float exactly.
 		return ((s >> 8) & 0xffffff) / 16777216
 	end
+	-- Small seeds give tiny first numbers (seed 1 starts near 0.00002), so
+	-- every low seed would make the same first rolls. The first few are
+	-- thrown away to mix the state.
+	for _ = 1, WARMUP do
+		next()
+	end
+	return next
 end
 
 -- A random element of a list (nil for an empty list).

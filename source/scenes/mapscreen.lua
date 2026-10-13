@@ -1,6 +1,7 @@
 -- The map screen: the 4x4 world on one 400x240 screen, each area 100x60
 -- with its tiles at 8px (a quarter of the room size). Only areas you've
--- visited show; the one you're in has a blinking frame. Ⓐ or Ⓑ goes back.
+-- visited show; the one you're in has a blinking frame. A thick line marks
+-- where one act's region meets another's. Ⓐ or Ⓑ goes back.
 
 local gfx <const> = playdate.graphics
 local pd <const> = playdate
@@ -14,6 +15,7 @@ MapScreen.__index = MapScreen
 local SCALE <const> = 4
 local SMALL <const> = config.TILE // SCALE
 local AREA_W <const>, AREA_H <const> = 400 // config.MAP, 240 // config.MAP
+local BORDER <const> = 2
 
 function MapScreen.new(world, explore, onClose)
 	return setmetatable({ world = world, explore = explore, onClose = onClose, frame = 0 }, MapScreen)
@@ -50,6 +52,28 @@ function MapScreen:draw()
 			pickup.draw(area, tiles, Game.kits, toMap, SMALL)
 		end
 	end
+	-- region borders: wherever a visited area meets another act's area
+	local cells = world.gen.cells
+	gfx.setColor(gfx.kColorWhite)
+	for k in pairs(world.visited) do
+		local ax, ay = (k % config.MAP) * AREA_W, (k // config.MAP) * AREA_H
+		for _, d in ipairs(Game.grid.DIRS) do
+			local nx, ny = k % config.MAP + d[1], k // config.MAP + d[2]
+			local other = nx >= 0 and ny >= 0 and nx < config.MAP and ny < config.MAP and cells[ny * config.MAP + nx]
+			if other and other.act ~= cells[k].act then
+				if d[3] == "N" then
+					gfx.fillRect(ax, ay - 1, AREA_W, BORDER)
+				elseif d[3] == "S" then
+					gfx.fillRect(ax, ay + AREA_H - 1, AREA_W, BORDER)
+				elseif d[3] == "W" then
+					gfx.fillRect(ax - 1, ay, BORDER, AREA_H)
+				else
+					gfx.fillRect(ax + AREA_W - 1, ay, BORDER, AREA_H)
+				end
+			end
+		end
+	end
+
 	-- where you are: your tile (or your house door, when inside) and a blinking frame
 	local k = here.cell.k
 	local ax, ay = (k % config.MAP) * AREA_W, (k // config.MAP) * AREA_H

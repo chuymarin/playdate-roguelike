@@ -8,14 +8,10 @@ local config <const> = Game.config
 local World = {}
 World.__index = World
 
--- Builds the world for `seed`; if that seed gives no valid map, the next
--- seeds are tried (world.seed is the one used).
+-- Builds the world for `seed`: the map (world/worldgen.lua), then what
+-- each area holds (world/story.lua). Every seed gives a valid world.
 function World.new(seed)
-	local gen = worldgen.generate(seed)
-	while not gen do
-		seed = seed + 1
-		gen = worldgen.generate(seed)
-	end
+	local gen = Game.storyRoller.roll(worldgen.generate(seed))
 	return setmetatable({
 		seed = seed,
 		gen = gen,

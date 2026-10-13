@@ -3,7 +3,8 @@
 --
 -- The deepest room holds the NPC, locked in a barred cell against the
 -- north or south wall (whichever has no doorway). The cell door opens with
--- the cell key, which is in a chest in another dungeon room.
+-- the cell key, which is in a chest in another dungeon room (chests are
+-- placed by areas/area.lua).
 
 local layout <const> = Game.layout
 local rng <const> = Game.rng
@@ -52,18 +53,7 @@ Game.areaKinds.dungeon = {
 		if ctx.cell.role == "goal" then
 			buildCell(area, ctx, kit)
 		end
-		if ctx.cell.chest then
-			-- farthest from the doorways
-			local cells = layout.freeCells(area, anchors)
-			local far = {}
-			for i = #cells, 1, -1 do
-				far[#far + 1] = cells[i]
-			end
-			local c = helpers.placeSolid(area, far, anchors)
-			if c then
-				Game.objects.add(area, "chest", c[1], c[2], { item = ctx.cell.chest, tile = ctx.kits.items.chest[1] })
-			end
-		end
+		helpers.placeChest(area, ctx, anchors)
 
 		helpers.scatter(area, r, 0.14, kit.pillar, true, anchors)
 		helpers.spawnEnemies(area, r, ctx.cell.enemies, kit.enemy, 2)

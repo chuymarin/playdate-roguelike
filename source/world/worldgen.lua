@@ -1,18 +1,22 @@
--- Builds the world map: 12 areas on a 4x4 grid, linked into paths.
+-- Builds the world map (Rulebook Chapter 2 and Chapter 6, steps 1-5): the
+-- 4x4 map cut into four tetromino pieces, one per act, joined by gates.
 --
--- 1. Blanks: the 4 unused cells are separate spots of 1-3 cells that don't
---    touch each other, and the cells left must stay connected.
--- 2. Dungeon: 4-6 connected cells grown from a cell on the map's edge, with
---    one entrance from the overworld, locked. The NPC (the goal) is locked
---    in a cell in its deepest room; the cell key is in a chest in the
---    deepest other room (not the entrance).
--- 3. Start: the overworld cell farthest from the dungeon door, in the town.
--- 4. Town: 2-4 cells. Two sit together around the start; each extra one goes
---    next to them or far away as an outpost (50/50).
--- 5. The rest: forest and ruins mazes at dead ends, deepest first, holding
---    the key chest, the sword chest and extra chests; camps in between. The
---    cell just outside the dungeon door prefers to be a camp.
+-- 1. Cut the map: one of the 117 ways to tile 4x4 with tetrominoes
+--    (I, O, T, L, J, S, Z in every rotation and mirror), found once by
+--    backtracking. T pieces always come in pairs.
+-- 2. Order the acts so each piece touches the next one.
+-- 3. Act IV's entrance: a cell of the last piece next to Act III whose
+--    removal leaves the other three connected (an end of the piece).
+-- 4. Link the areas of each piece: every neighbor pair inside it, except an
+--    O, which is a loop or a U (Act IV's O is always a U, with the entrance
+--    at one end, so the entrance has a single door into the dungeon).
+-- 5. Gates: one shared side between each act and the next (Act III's gate
+--    leads into the entrance). No other links between pieces.
+-- 6. Kinds: the start town in Act I (the cell farthest from Act I's gate),
+--    the entrance and 3 dungeon rooms in Act IV (the captive in the
+--    deepest), the rest rolled per act from data/story.lua.
 --
+-- The chests (what each area holds) are rolled by world/story.lua.
 -- Same algorithm and random sequence as the Room Scale Lab artifact.
 
 local grid <const> = Game.grid
@@ -22,386 +26,405 @@ local config <const> = Game.config
 local worldgen = {}
 
 local MAP <const> = config.MAP
-local CELLS = {}
-for k = 0, MAP * MAP - 1 do
-	CELLS[#CELLS + 1] = k
-end
 
 local function nbrs(k)
 	return grid.cellNeighbors(k, MAP)
 end
 
-local function onEdge(k)
-	local x, y = k % MAP, k // MAP
-	return x == 0 or y == 0 or x == MAP - 1 or y == MAP - 1
+-- ---------- the 117 tilings ----------
+
+-- Each base shape's cells; rotations are generated, duplicates dropped.
+local BASE_SHAPES = {
+	{ "I", { { 0, 0 }, { 1, 0 }, { 2, 0 }, { 3, 0 } } },
+	{ "O", { { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 } } },
+	{ "T", { { 0, 0 }, { 1, 0 }, { 2, 0 }, { 1, 1 } } },
+	{ "L", { { 0, 0 }, { 0, 1 }, { 0, 2 }, { 1, 2 } } },
+	{ "J", { { 1, 0 }, { 1, 1 }, { 1, 2 }, { 0, 2 } } },
+	{ "S", { { 1, 0 }, { 2, 0 }, { 0, 1 }, { 1, 1 } } },
+	{ "Z", { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 2, 1 } } },
+}
+
+-- Cells sorted top to bottom, left to right, moved so the first is (0, 0).
+local function normalize(cells)
+	local out = {}
+	for i, c in ipairs(cells) do
+		out[i] = { c[1], c[2] }
+	end
+	table.sort(out, function(a, b)
+		if a[2] ~= b[2] then
+			return a[2] < b[2]
+		end
+		return a[1] < b[1]
+	end)
+	local ox, oy = out[1][1], out[1][2]
+	for _, c in ipairs(out) do
+		c[1], c[2] = c[1] - ox, c[2] - oy
+	end
+	return out
 end
 
--- All neighbors of every cell in list, duplicates kept (they weight the pick).
-local function flatNbrs(list)
+local function shapeKey(cells)
+	local parts = {}
+	for _, c in ipairs(cells) do
+		parts[#parts + 1] = c[1] .. "," .. c[2]
+	end
+	return table.concat(parts, ";")
+end
+
+-- The 19 fixed tetrominoes: { name, cells } in a fixed order.
+local function fixedShapes()
 	local out = {}
-	for _, k in ipairs(list) do
-		for _, n in ipairs(nbrs(k)) do
-			out[#out + 1] = n
+	for _, base in ipairs(BASE_SHAPES) do
+		local seen = {}
+		local cur = base[2]
+		for _ = 1, 4 do
+			local n = normalize(cur)
+			local key = shapeKey(n)
+			if not seen[key] then
+				seen[key] = true
+				out[#out + 1] = { base[1], n }
+			end
+			local rotated = {}
+			for i, c in ipairs(cur) do
+				rotated[i] = { -c[2], c[1] }
+			end
+			cur = rotated
 		end
 	end
 	return out
 end
 
-local function maxOf(list, fn)
-	local best = -math.huge
-	for _, v in ipairs(list) do
-		best = math.max(best, fn(v))
-	end
-	return best
-end
-
-local function placeBlanks(r, blanks)
-	for attempt = 0, 599 do
-		local touchOk = attempt >= 400 -- fallback, only if spots can't stay apart
-		local blank = grid.set()
-		local function fits(k)
-			if blank:has(k) then
-				return false
-			end
-			if touchOk then
-				return true
-			end
-			for _, n in ipairs(nbrs(k)) do
-				if blank:has(n) then
-					return false
-				end
-			end
-			return true
-		end
-		local left, stuck = blanks, false
-		while left > 0 do
-			local size = math.min(left, rng.int(r, 1, 3))
-			local free = grid.filter(CELLS, fits)
-			if #free == 0 then
-				stuck = true
+-- Every tiling: { piece = {[k] = 1..4}, shapes = { "I", "T", ... } }, in the
+-- order a depth-first search finds them (fill the first empty cell, trying
+-- shapes in fixedShapes() order).
+local function findTilings()
+	local shapes = fixedShapes()
+	local board, names, out = {}, {}, {}
+	local function rec()
+		local first = nil
+		for k = 0, MAP * MAP - 1 do
+			if not board[k] then
+				first = k
 				break
 			end
-			local spot = { rng.pick(r, free) }
-			while #spot < size do
-				local opts = grid.filter(flatNbrs(spot), function(n)
-					return not grid.contains(spot, n) and fits(n)
-				end)
-				if #opts == 0 then
+		end
+		if not first then
+			local piece = {}
+			for k = 0, MAP * MAP - 1 do
+				piece[k] = board[k]
+			end
+			out[#out + 1] = { piece = piece, shapes = { table.unpack(names) } }
+			return
+		end
+		local x0, y0 = first % MAP, first // MAP
+		for _, shape in ipairs(shapes) do
+			local fits = true
+			for _, c in ipairs(shape[2]) do
+				local x, y = x0 + c[1], y0 + c[2]
+				if x < 0 or y < 0 or x >= MAP or y >= MAP or board[y * MAP + x] then
+					fits = false
 					break
 				end
-				spot[#spot + 1] = rng.pick(r, opts)
 			end
-			for _, k in ipairs(spot) do
-				blank:add(k)
-			end
-			left = left - #spot
-		end
-		if not stuck then
-			local open = grid.set(grid.filter(CELLS, function(k)
-				return not blank:has(k)
-			end))
-			if grid.connected(open, MAP) then
-				return open
+			if fits then
+				names[#names + 1] = shape[1]
+				for _, c in ipairs(shape[2]) do
+					board[(y0 + c[2]) * MAP + x0 + c[1]] = #names
+				end
+				rec()
+				for _, c in ipairs(shape[2]) do
+					board[(y0 + c[2]) * MAP + x0 + c[1]] = nil
+				end
+				names[#names] = nil
 			end
 		end
 	end
-	return nil
+	rec()
+	return out
 end
 
--- Random spanning tree over `cells` (a Set) grown from root; the `first`
--- cells are joined before the rest.
-local function growTree(r, cells, root, first)
-	local inTree = grid.set({ root })
-	local edges, depth = {}, { [root] = 0 }
-	local function grow(only)
-		while true do
-			local opts = {}
-			for _, a in ipairs(inTree.items) do
-				for _, b in ipairs(nbrs(a)) do
-					if cells:has(b) and not inTree:has(b) and (not only or only:has(b)) then
-						opts[#opts + 1] = { a, b }
-					end
+worldgen.TILINGS = findTilings()
+
+-- ---------- helpers ----------
+
+local function touches(piece, a, b)
+	for k = 0, MAP * MAP - 1 do
+		if piece[k] == a then
+			for _, n in ipairs(nbrs(k)) do
+				if piece[n] == b then
+					return true
 				end
 			end
-			if #opts == 0 then
-				return
-			end
-			local e = rng.pick(r, opts)
-			inTree:add(e[2])
-			edges[#edges + 1] = e
-			depth[e[2]] = depth[e[1]] + 1
 		end
 	end
-	if first and #first > 0 then
-		grow(grid.set(first))
-	end
-	grow(nil)
-	return { edges = edges, depth = depth, complete = inTree:size() == cells:size() }
+	return false
 end
 
--- Returns the world description, or nil if no valid map came out (the
--- caller tries the next seed). Cells: { k, x, y, kind, role, links = {N=true..},
--- locked = dir, lockedTo = dir, chest = contents, enemies, outpost }.
-function worldgen.generate(seed, loop)
-	if loop == nil then
-		loop = true
-	end
-	local r = rng.new(seed)
-	for _ = 1, 200 do
-		local open = placeBlanks(r, MAP * MAP - config.AREAS)
-		if open then
-			local result = worldgen.try(r, open, loop, seed)
-			if result then
-				return result
+-- The cells of Act IV's piece that can be its entrance: next to Act III, and
+-- the other three stay connected without it (an end of the piece).
+local function entranceOptions(piece, order)
+	local out = {}
+	for k = 0, MAP * MAP - 1 do
+		if piece[k] == order[4] then
+			local nextToIII = false
+			for _, n in ipairs(nbrs(k)) do
+				if piece[n] == order[3] then
+					nextToIII = true
+				end
+			end
+			if nextToIII then
+				local rest = grid.set()
+				for j = 0, MAP * MAP - 1 do
+					if piece[j] == order[4] and j ~= k then
+						rest:add(j)
+					end
+				end
+				if grid.connected(rest, MAP) then
+					out[#out + 1] = k
+				end
 			end
 		end
 	end
-	return nil
+	return out
 end
 
-function worldgen.try(r, open, loop, seed)
-	local D = rng.int(r, 4, 6)
-	local T = rng.int(r, 2, math.min(4, 9 - D))
-
-	-- dungeon, grown from an edge cell; the overworld must stay in one piece
-	local dun = grid.set({ rng.pick(r, grid.filter(open.items, onEdge)) })
-	while dun:size() < D do
-		local opts = grid.filter(flatNbrs(dun.items), function(n)
-			return open:has(n) and not dun:has(n)
-		end)
-		if #opts == 0 then
-			break
+-- Orders of the 4 pieces where each touches the next and Act IV has an
+-- entrance, in lexicographic order. (Every tiling has at least one.)
+local function actOrders(piece)
+	local out = {}
+	local used, cur = {}, {}
+	local function rec()
+		if #cur == 4 then
+			if #entranceOptions(piece, cur) > 0 then
+				out[#out + 1] = { table.unpack(cur) }
+			end
+			return
 		end
-		dun:add(rng.pick(r, opts))
+		for p = 1, 4 do
+			if not used[p] and (#cur == 0 or touches(piece, cur[#cur], p)) then
+				used[p] = true
+				cur[#cur + 1] = p
+				rec()
+				cur[#cur] = nil
+				used[p] = nil
+			end
+		end
 	end
-	local over = grid.set(grid.filter(open.items, function(k)
-		return not dun:has(k)
-	end))
-	if dun:size() < D or not grid.connected(over, MAP) then
-		return nil
+	rec()
+	return out
+end
+
+-- Neighbor pairs { a, b } (a < b) inside a list of cells.
+local function innerPairs(cells)
+	local out = {}
+	for _, a in ipairs(cells) do
+		for _, b in ipairs(nbrs(a)) do
+			if a < b and grid.contains(cells, b) then
+				out[#out + 1] = { a, b }
+			end
+		end
 	end
-	local doors = {}
-	for _, k in ipairs(dun.items) do
+	return out
+end
+
+-- Link distances from `from` over the links between `cells`.
+local function linkDistances(cells, from, links)
+	local dist = { [from] = 0 }
+	local queue, head = { from }, 1
+	while head <= #queue do
+		local k = queue[head]
+		head = head + 1
 		for _, n in ipairs(nbrs(k)) do
-			if over:has(n) then
-				doors[#doors + 1] = { k, n }
+			if dist[n] == nil and grid.contains(cells, n) and links[k][grid.cellDir(k, n, MAP)] then
+				dist[n] = dist[k] + 1
+				queue[#queue + 1] = n
 			end
 		end
 	end
-	local door = rng.pick(r, doors)
-	local ein, eout = door[1], door[2]
+	return dist
+end
+worldgen.linkDistances = linkDistances
 
-	-- start: the overworld cell farthest from the dungeon door
-	local fromDoor = grid.cellDistances(eout, over, MAP)
-	local maxD = maxOf(over.items, function(k)
-		return fromDoor[k]
-	end)
-	local start = rng.pick(r, grid.filter(over.items, function(k)
-		return fromDoor[k] == maxD
-	end))
-	local fromStart = grid.cellDistances(start, over, MAP)
-
-	-- town: the start plus a neighbor, then extra houses near or far (outposts)
-	local town, outposts = { start }, {}
-	local function near()
-		local seen = grid.set(flatNbrs(town))
-		return grid.filter(seen.items, function(n)
-			return over:has(n) and not grid.contains(town, n) and n ~= eout
-		end)
-	end
-	if #near() > 0 then
-		town[#town + 1] = rng.pick(r, near())
-	end
-	while #town + #outposts < T do
-		local function taken(k)
-			return grid.contains(town, k) or grid.contains(outposts, k)
+-- The cells of `cells` farthest from `from` (by links); ties broken by r.
+local function farthest(r, cells, from, links)
+	local dist = linkDistances(cells, from, links)
+	local best, list = -1, {}
+	for _, k in ipairs(cells) do
+		local d = dist[k] or -1
+		if d > best then
+			best, list = d, { k }
+		elseif d == best then
+			list[#list + 1] = k
 		end
-		local coin = r() < 0.5
-		if coin and #near() > 0 then
-			town[#town + 1] = rng.pick(r, near())
-		else
-			local far = grid.filter(over.items, function(k)
-				if taken(k) then
-					return false
-				end
-				for _, t in ipairs(town) do
-					if grid.contains(nbrs(t), k) then
-						return false
-					end
-				end
-				return true
-			end)
-			if #far == 0 then
-				if #near() > 0 then
-					town[#town + 1] = rng.pick(r, near())
-				else
-					break
-				end
-			else
-				local best = maxOf(far, function(k)
-					return fromStart[k]
-				end)
-				outposts[#outposts + 1] = rng.pick(r, grid.filter(far, function(k)
-					return fromStart[k] == best
-				end))
+	end
+	return rng.pick(r, list)
+end
+worldgen.farthest = farthest
+
+local function rollKind(r, kinds, campsLeft)
+	local total, options = 0, {}
+	for _, entry in ipairs(kinds) do
+		if entry[1] ~= "camp" or campsLeft > 0 then
+			options[#options + 1] = entry
+			total = total + entry[2]
+		end
+	end
+	local roll = r() * total
+	for _, entry in ipairs(options) do
+		roll = roll - entry[2]
+		if roll < 0 then
+			return entry[1]
+		end
+	end
+	return options[#options][1]
+end
+
+-- ---------- the generator ----------
+
+-- Returns the world description. Cells: { k, x, y, act, shape, kind, role
+-- ("start" / "entrance" / "goal"), links = {N=true..}, linkCount,
+-- gates = { [dir] = act } (the gate to the next act or from the previous
+-- one), locked / lockedTo = dir (the dungeon door), dungeon, enemies }.
+function worldgen.generate(seed)
+	local r = rng.new(seed)
+	local tilingIndex = rng.int(r, 1, #worldgen.TILINGS)
+	local tiling = worldgen.TILINGS[tilingIndex]
+	local order = rng.pick(r, actOrders(tiling.piece))
+
+	-- the cells of each act (ascending), and each cell's act
+	local actCells, actOf = { {}, {}, {}, {} }, {}
+	for act, p in ipairs(order) do
+		for k = 0, MAP * MAP - 1 do
+			if tiling.piece[k] == p then
+				actCells[act][#actCells[act] + 1] = k
+				actOf[k] = act
 			end
 		end
 	end
-	if #town + #outposts < T then
-		return nil
-	end
 
-	local tree = growTree(r, over, start, town)
-	if not tree.complete then
-		return nil
-	end
-	local dtree = growTree(r, dun, ein)
-	if not dtree.complete then
-		return nil
-	end
+	-- Act IV's entrance: an end of the piece, next to Act III
+	local entrance = rng.pick(r, entranceOptions(tiling.piece, order))
 
 	local cells = {}
-	for _, k in ipairs(open.items) do
-		cells[k] = { k = k, x = k % MAP, y = k // MAP, links = {}, linkCount = 0, enemies = 0, dungeon = dun:has(k) }
+	for k = 0, MAP * MAP - 1 do
+		cells[k] = {
+			k = k, x = k % MAP, y = k // MAP, act = actOf[k], shape = tiling.shapes[tiling.piece[k]],
+			links = {}, linkCount = 0, gates = {}, enemies = 0, dungeon = false,
+		}
 	end
 	local function link(a, b)
 		local da, db = grid.cellDir(a, b, MAP), grid.cellDir(b, a, MAP)
 		if not cells[a].links[da] then
 			cells[a].linkCount = cells[a].linkCount + 1
-		end
-		if not cells[b].links[db] then
 			cells[b].linkCount = cells[b].linkCount + 1
 		end
 		cells[a].links[da] = true
 		cells[b].links[db] = true
 	end
-	for _, e in ipairs(tree.edges) do
-		link(e[1], e[2])
+
+	-- links inside each piece; an O is a loop or a U
+	local shapes = {}
+	for act = 1, 4 do
+		local inner = innerPairs(actCells[act])
+		local shape = cells[actCells[act][1]].shape
+		shapes[act] = { shape = shape }
+		if shape == "O" then
+			local loop = r() < 0.5
+			if act == 4 then
+				loop = false
+			end
+			shapes[act].loop = loop
+			if not loop then
+				local removable = inner
+				if act == 4 then
+					removable = grid.filter(inner, function(p)
+						return p[1] == entrance or p[2] == entrance
+					end)
+				end
+				local cut = rng.pick(r, removable)
+				inner = grid.filter(inner, function(p)
+					return p ~= cut
+				end)
+			end
+		end
+		for _, p in ipairs(inner) do
+			link(p[1], p[2])
+		end
 	end
-	for _, e in ipairs(dtree.edges) do
-		link(e[1], e[2])
-	end
-	link(ein, eout)
-	cells[ein].locked = grid.cellDir(ein, eout, MAP)
-	cells[eout].lockedTo = grid.cellDir(eout, ein, MAP)
-	if loop then
-		local cand = {}
-		for _, a in ipairs(over.items) do
+
+	-- gates between consecutive acts
+	local gates = {}
+	for act = 1, 3 do
+		local sides = {}
+		for _, a in ipairs(actCells[act]) do
 			for _, b in ipairs(nbrs(a)) do
-				if over:has(b) and a < b and not cells[a].links[grid.cellDir(a, b, MAP)] then
-					cand[#cand + 1] = { a, b }
+				if actOf[b] == act + 1 and (act < 3 or b == entrance) then
+					sides[#sides + 1] = { a, b }
 				end
 			end
 		end
-		if #cand > 0 then
-			local e = rng.pick(r, cand)
-			link(e[1], e[2])
-		end
+		local side = rng.pick(r, sides)
+		link(side[1], side[2])
+		cells[side[1]].gates[grid.cellDir(side[1], side[2], MAP)] = act
+		cells[side[2]].gates[grid.cellDir(side[2], side[1], MAP)] = act
+		gates[act] = { from = side[1], to = side[2] }
 	end
 
 	-- kinds and roles
-	for _, k in ipairs(dun.items) do
-		cells[k].kind = "dungeon"
+	local links = {}
+	for k = 0, MAP * MAP - 1 do
+		links[k] = cells[k].links
 	end
-	for _, k in ipairs(town) do
-		cells[k].kind = "town"
-	end
-	for _, k in ipairs(outposts) do
-		cells[k].kind = "town"
-		cells[k].outpost = true
-	end
+	local start = farthest(r, actCells[1], gates[1].from, links)
+	cells[start].kind = "town"
 	cells[start].role = "start"
-	local deepest = maxOf(dun.items, function(k)
-		return dtree.depth[k]
-	end)
-	local npc = rng.pick(r, grid.filter(dun.items, function(k)
-		return dtree.depth[k] == deepest
-	end))
-	cells[npc].role = "goal"
-
-	local rest = grid.filter(over.items, function(k)
-		return not cells[k].kind
-	end)
-	local campCount = #rest >= 5 and 2 or 1
-	local camps = {}
-	if grid.contains(rest, eout) then
-		camps[#camps + 1] = eout
-	end
-	rest = grid.filter(rest, function(k)
-		return k ~= eout
-	end)
-	-- dead ends first, then the deepest; stable (ties keep their order)
-	local order = {}
-	for i, k in ipairs(rest) do
-		order[k] = i
-	end
-	table.sort(rest, function(a, b)
-		local la, lb = cells[a].linkCount == 1 and 1 or 0, cells[b].linkCount == 1 and 1 or 0
-		if la ~= lb then
-			return la > lb
-		end
-		if fromStart[a] ~= fromStart[b] then
-			return fromStart[a] > fromStart[b]
-		end
-		return order[a] < order[b]
-	end)
-	local poiCount = math.max(2, #rest - math.max(0, campCount - #camps))
-	local pois = {}
-	for i, k in ipairs(rest) do
-		if i <= poiCount then
-			pois[#pois + 1] = k
-		else
-			camps[#camps + 1] = k
-		end
-	end
-	for _, k in ipairs(camps) do
-		cells[k].kind = "camp"
-	end
-	for _, k in ipairs(pois) do
-		cells[k].kind = r() < 0.5 and "forest" or "ruins"
-	end
-	if #pois < 2 then
-		return nil
-	end
-	-- every point of interest has a closed chest: the key, the sword, then hearts
-	cells[pois[1]].chest = "key"
-	cells[pois[2]].chest = "sword"
-	for i = 3, #pois do
-		cells[pois[i]].chest = "heart"
-	end
-	for _, k in ipairs(pois) do
-		cells[k].enemies = 1 + (r() < 0.4 and 1 or 0)
-	end
-	-- you reach the sword without one, so its guard is a single enemy
-	cells[pois[2]].enemies = 1
-	for _, k in ipairs(dun.items) do
-		if k ~= npc and k ~= ein then
-			cells[k].enemies = r() < 0.7 and 1 or 0
-		end
-	end
-	-- the cell key: deepest dungeon room besides the NPC's and the entrance,
-	-- lowest cell on ties (no random draw, so maps still match the lab)
-	local keyRoom = nil
-	for _, k in ipairs(dun.items) do
-		if k ~= npc and k ~= ein then
-			if not keyRoom or dtree.depth[k] > dtree.depth[keyRoom] or (dtree.depth[k] == dtree.depth[keyRoom] and k < keyRoom) then
-				keyRoom = k
+	local acts = Game.story.acts
+	for act = 1, 3 do
+		local campsLeft = acts[act].camps or 1
+		for _, k in ipairs(actCells[act]) do
+			if not cells[k].kind then
+				local kind = rollKind(r, acts[act].kinds, campsLeft)
+				if kind == "camp" then
+					campsLeft = campsLeft - 1
+				end
+				cells[k].kind = kind
 			end
 		end
 	end
-	if not keyRoom then
-		return nil
+	cells[entrance].kind = "entrance"
+	cells[entrance].role = "entrance"
+	local rooms = grid.filter(actCells[4], function(k)
+		return k ~= entrance
+	end)
+	for _, k in ipairs(rooms) do
+		cells[k].kind = "dungeon"
+		cells[k].dungeon = true
 	end
-	cells[keyRoom].chest = "cellKey"
+	local goal = farthest(r, rooms, entrance, links)
+	cells[goal].role = "goal"
+	-- the dungeon door: from the entrance into its one linked room
+	local firstRoom
+	for _, d in ipairs(grid.DIRS) do
+		if cells[entrance].links[d[3]] and not cells[entrance].gates[d[3]] then
+			firstRoom = entrance + d[1] + d[2] * MAP
+			cells[entrance].locked = d[3]
+			cells[firstRoom].lockedTo = grid.OPP[d[3]]
+		end
+	end
 
 	return {
 		seed = seed,
 		cells = cells,
+		tiling = tilingIndex,
+		order = order,
+		shapes = shapes,
+		actCells = actCells,
+		gates = gates,
+		links = links,
 		start = start,
-		goal = npc,
-		cellKey = keyRoom,
-		dungeonDoor = { inside = ein, outside = eout },
-		census = { dungeon = D, town = T, poi = #pois, camp = #camps },
+		entrance = entrance,
+		goal = goal,
+		dungeonDoor = { inside = firstRoom, outside = entrance },
 	}
 end
 

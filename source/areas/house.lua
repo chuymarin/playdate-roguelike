@@ -18,7 +18,10 @@ local function compass(from, to)
 	return ns .. ew
 end
 
-local PLACE_NAMES = { forest = "the forest", ruins = "the ruins" }
+local PLACE_NAMES = {
+	forest = "the forest", ruins = "the ruins", town = "a town", camp = "a camp",
+	entrance = "the clearing by the dungeon", dungeon = "the dungeon",
+}
 
 local function hintLines(ctx, r)
 	local gen, here = ctx.world.gen, ctx.cell.k
@@ -54,7 +57,7 @@ Game.areaKinds.house = {
 			area.home = true
 			local c = helpers.placeSolid(area, cells, anchors)
 			if c then
-				Game.objects.add(area, "chest", c[1], c[2], { item = "shield", tile = ctx.kits.items.chest[1] })
+				Game.objects.add(area, "chest", c[1], c[2], { item = ctx.cell.chest, tile = ctx.kits.items.chest[1] })
 			end
 		else
 			local c = helpers.placeSolid(area, cells, anchors)

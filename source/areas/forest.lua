@@ -1,5 +1,5 @@
--- Forest and ruins: small mazes at the map's dead ends. Each hides a closed
--- chest (the key, the sword or a heart) in the maze's farthest corner.
+-- Forest and ruins: small mazes. The area's chest (placed by areas/area.lua)
+-- ends up in the maze's farthest corner.
 -- Some walls are knocked down (15% of the trees, 30% of the ruin walls,
 -- leaving rubble), which opens loops to run around enemies.
 
@@ -23,20 +23,7 @@ local function build(area, ctx, kit, walls, borderTiles)
 		end
 	end
 	layout.joinOpenings(area)
-	local anchors = layout.anchors(area)
-
-	if ctx.cell.chest then
-		-- farthest free cell first
-		local cells = layout.freeCells(area, anchors)
-		local far = {}
-		for i = #cells, 1, -1 do
-			far[#far + 1] = cells[i]
-		end
-		local c = helpers.placeSolid(area, far, anchors)
-		if c then
-			Game.objects.add(area, "chest", c[1], c[2], { item = ctx.cell.chest, tile = ctx.kits.items.chest[1] })
-		end
-	end
+	helpers.placeChest(area, ctx)
 	helpers.spawnEnemies(area, r, ctx.cell.enemies, kit.enemy, 1)
 end
 
