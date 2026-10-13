@@ -1,6 +1,8 @@
 -- House interior: wall border, an exit door in the middle of the bottom
 -- wall, furniture along the walls. Home (the start town's house) holds the
--- first chest, with the shield; other houses have a villager with a hint.
+-- first chest, with the shield; other houses have a villager with hints
+-- about their region: where its key is, where the sword is (until Act II),
+-- and which way the gate out is (Rulebook B.3).
 
 local layout <const> = Game.layout
 local rng <const> = Game.rng
@@ -23,19 +25,30 @@ local PLACE_NAMES = {
 	entrance = "the clearing by the dungeon", dungeon = "the dungeon",
 }
 
-local function hintLines(ctx, r)
-	local gen, here = ctx.world.gen, ctx.cell.k
-	local hints = {}
-	for k, cell in pairs(gen.cells) do
-		if cell.chest == "key" then
-			hints[#hints + 1] = "They say the dungeon key is hidden in " .. PLACE_NAMES[cell.kind] .. " to the " .. compass(here, k) .. "."
-		elseif cell.chest == "sword" then
-			hints[#hints + 1] = "A sword was left in a chest in " .. PLACE_NAMES[cell.kind] .. " to the " .. compass(here, k) .. "."
-		end
+-- "the ruins to the north-east", or "this town" for the villager's own cell.
+local function where(gen, here, k)
+	if k == here then
+		return Game.text.hereTown
 	end
-	hints[#hints + 1] = "The dungeon door is to the " .. compass(here, gen.dungeonDoor.outside) .. ". Someone is locked up deep inside."
-	table.sort(hints)
-	return { rng.pick(r, Game.text.greetings), rng.pick(r, hints) }
+	return PLACE_NAMES[gen.cells[k].kind] .. " to the " .. compass(here, k)
+end
+
+local function hintLines(ctx, r)
+	local gen, here, act = ctx.world.gen, ctx.cell.k, ctx.cell.act
+	local text = Game.text
+	local lines = { rng.pick(r, text.greetings) }
+	if gen.keys and gen.keys[act] then
+		lines[#lines + 1] = text.hintKey:format(where(gen, here, gen.keys[act]))
+	end
+	if gen.sword and act <= gen.cells[gen.sword].act then
+		lines[#lines + 1] = text.hintSword:format(where(gen, here, gen.sword))
+	end
+	local gate = gen.gates[act]
+	if gate then
+		local dir = gate.from == here and text.hereGate or ("to the " .. compass(here, gate.from))
+		lines[#lines + 1] = text.hintGate:format(dir)
+	end
+	return lines
 end
 
 Game.areaKinds.house = {

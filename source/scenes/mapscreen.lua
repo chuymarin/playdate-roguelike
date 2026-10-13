@@ -1,7 +1,8 @@
 -- The map screen: the 4x4 world on one 400x240 screen, each area 100x60
 -- with its tiles at 8px (a quarter of the room size). Only areas you've
 -- visited show; the one you're in has a blinking frame. A thick line marks
--- where one act's region meets another's. Ⓐ or Ⓑ goes back.
+-- where one act's region meets another's, with a gap at the gate (the gate
+-- itself shows locked or open in the area's border). Ⓐ or Ⓑ goes back.
 
 local gfx <const> = playdate.graphics
 local pd <const> = playdate
@@ -16,6 +17,7 @@ local SCALE <const> = 4
 local SMALL <const> = config.TILE // SCALE
 local AREA_W <const>, AREA_H <const> = 400 // config.MAP, 240 // config.MAP
 local BORDER <const> = 2
+local GATE_GAP <const> = 18
 
 function MapScreen.new(world, explore, onClose)
 	return setmetatable({ world = world, explore = explore, onClose = onClose, frame = 0 }, MapScreen)
@@ -61,14 +63,18 @@ function MapScreen:draw()
 			local nx, ny = k % config.MAP + d[1], k // config.MAP + d[2]
 			local other = nx >= 0 and ny >= 0 and nx < config.MAP and ny < config.MAP and cells[ny * config.MAP + nx]
 			if other and other.act ~= cells[k].act then
-				if d[3] == "N" then
-					gfx.fillRect(ax, ay - 1, AREA_W, BORDER)
-				elseif d[3] == "S" then
-					gfx.fillRect(ax, ay + AREA_H - 1, AREA_W, BORDER)
-				elseif d[3] == "W" then
-					gfx.fillRect(ax - 1, ay, BORDER, AREA_H)
+				-- a gap in the line where the gate is
+				local gap = cells[k].gates[d[3]] and GATE_GAP or 0
+				if d[3] == "N" or d[3] == "S" then
+					local y = d[3] == "N" and ay - 1 or ay + AREA_H - 1
+					local half = (AREA_W - gap) // 2
+					gfx.fillRect(ax, y, half, BORDER)
+					gfx.fillRect(ax + AREA_W - half, y, half, BORDER)
 				else
-					gfx.fillRect(ax + AREA_W - 1, ay, BORDER, AREA_H)
+					local x = d[3] == "W" and ax - 1 or ax + AREA_W - 1
+					local half = (AREA_H - gap) // 2
+					gfx.fillRect(x, ay, BORDER, half)
+					gfx.fillRect(x, ay + AREA_H - half, BORDER, half)
 				end
 			end
 		end

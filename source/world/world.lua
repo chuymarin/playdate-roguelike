@@ -17,6 +17,7 @@ function World.new(seed)
 		gen = gen,
 		areas = {},
 		visited = {},
+		actsSeen = {}, -- acts whose region you've walked into (for the banner)
 		status = {}, -- object id -> status (world/objects.lua)
 		respawn = nil, -- { id, x, y }
 	}, World)

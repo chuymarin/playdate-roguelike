@@ -10,6 +10,9 @@ local VERBOSE = arg[4] == "v"
 local GOD = arg[5] == "god" -- the hero can't be hurt: checks progression, not fighting skill
 stub = dofile("stub.lua")
 stub.boot()
+local keyPickups = 0
+local give = Game.Player.give
+Game.Player.give = function(self, id) if id == "key" then keyPickups = keyPickups + 1 end return give(self, id) end
 if GOD then
   Game.Player.hurt = function() return false end
   local enter = Game.Explore.enter
@@ -184,7 +187,7 @@ for act = 1, 4 do
   if (E().player.items.key or 0) > before then keysFound = keysFound + 1 end
 end
 log[#log + 1] = "sword " .. tostring(E().player:has("sword"))
-log[#log + 1] = "keys " .. keysFound
+log[#log + 1] = "keys " .. keyPickups
 travel(gen.dungeonDoor.outside); shot("dungeon_door")
 for _ = 1, 6 do
   if E().player:has("cellKey") then break end

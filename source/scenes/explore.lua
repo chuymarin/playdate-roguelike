@@ -31,6 +31,7 @@ Explore.__index = Explore
 local REPEAT_DELAY <const> = 8 -- frames held before walking repeats
 local REPEAT_EVERY <const> = 5
 local TOAST_FRAMES <const> = 60
+local BANNER_FRAMES <const> = 100
 local BUTTON_DIRS = {
 	{ pd.kButtonUp, "N" },
 	{ pd.kButtonRight, "E" },
@@ -75,6 +76,12 @@ function Explore:enter(id, x, y, facing)
 	p:face(facing)
 	p.swing, p.guard = 0, 0
 	self.world.visited[area.cell.k] = true
+	-- the act's title, the first time you walk into its region
+	local act = area.cell.act
+	if act and not self.world.actsSeen[act] then
+		self.world.actsSeen[act] = true
+		self.bannerText, self.bannerFrames = Game.story.acts[act].name, BANNER_FRAMES
+	end
 	self.enemies = {}
 	for i, spawn in ipairs(area.enemySpawns) do
 		local enemy = Game.Enemy.new(spawn)
@@ -374,6 +381,9 @@ function Explore:update()
 	if self.toastFrames and self.toastFrames > 0 then
 		self.toastFrames = self.toastFrames - 1
 	end
+	if self.bannerFrames and self.bannerFrames > 0 then
+		self.bannerFrames = self.bannerFrames - 1
+	end
 	if self.dialogue then
 		if self.dialogue:update() then
 			local done = self.dialogue.onDone
@@ -442,6 +452,15 @@ function Explore:draw()
 		gfx.setColor(gfx.kColorWhite)
 		gfx.fillRect(x, 20, w, 22)
 		gfx.drawText(self.toastText, x + 8, 23)
+	end
+	if self.bannerFrames and self.bannerFrames > 0 then
+		local w = gfx.getTextSize(self.bannerText) + 40
+		local x = 200 - w // 2
+		gfx.setColor(gfx.kColorWhite)
+		gfx.fillRect(x, 104, w, 32)
+		gfx.setColor(gfx.kColorBlack)
+		gfx.drawRect(x + 3, 107, w - 6, 26)
+		gfx.drawText(self.bannerText, x + 20, 112)
 	end
 	if self.dialogue then
 		self.dialogue:draw()

@@ -21,37 +21,38 @@ every object does, and the tables the story is rolled from.
   and **rules**: *trigger → conditions → effects* (`on use, when has key: take key, open`).
   What you carry is `items[]`.
 
-Work toward this is tracked in the repo's GitHub issues.
+Work toward this is tracked in the repo's GitHub issues. The first version (v1) of
+the act system is in the build: see below.
 
-## How the current build plays
+## How a run plays (v1)
 
-The code doesn't have the act system yet. Today a run goes like this:
+1. You wake up at home in Act I's region. The chest there holds a **shield**
+   (Ⓑ: pushes an enemy back one tile). In Act I you can only push enemies away.
+2. Every area has a chest. Face one and press Ⓐ: the chest disappears and leaves its
+   item, which you pick up by walking onto it. Each act's region hides the **key** to
+   its gate (the chest farthest from where you came in); Act II also hides the
+   **sword** (Ⓐ: swing at the tile in front of you). The rest hold **heart containers**.
+3. Walk into a locked gate with a key to open it; the next act's title shows the first
+   time you step into its region. Opened gates stay open.
+4. Villagers in town houses tell you where their region's key and the sword are, and
+   which way the gate is. Camps refill your hearts and become your respawn point.
+   Defeated enemies drop **coins** (only counted for now).
+5. Act IV: the entrance's chest holds the key to the dungeon door. Inside, the captive is
+   locked in a barred cell in the deepest room; another room holds the **cell key**.
+   Free them to win.
 
-1. You start at home. The chest there holds a **shield** (Ⓑ: block; pushes an enemy back one tile).
-2. Out in the world, maze areas hide closed chests. Face one and press Ⓐ: the chest
-   disappears and leaves its item, which you pick up by walking onto it. One holds the
-   **sword** (Ⓐ: swing at the tile in front of you), one the **dungeon key**, any others
-   a **heart container**.
-3. Villagers in the other houses give hints about where things are.
-4. Camps are safe: walking in refills your hearts and makes it your respawn point.
-5. The key opens the dungeon's locked door. Inside, the NPC is locked in a barred cell in the
-   deepest room; a chest in another dungeon room holds the **cell key**. Free them to win.
+System menu: **map** (the areas you've visited at 8px per tile, with a line where
+two acts' regions meet) and **new world**.
 
-System menu: **map** (the areas you've visited, at 8px per tile) and **new world**.
-
-## World generation (current build)
+## World generation
 
 One world seed builds the map (`world/worldgen.lua`, the same algorithm and random
-sequence as the Room Scale Lab artifact, so a seed shows the same map in both).
-Each area then builds from its own seed derived from the world seed; set
-`config.SEEDS.<kind>` to build every area of a kind from one fixed seed while testing.
-
-- 4 blank cells, as separate spots of 1-3 cells
-- dungeon: 4-6 areas, one locked entrance, the NPC in a locked cell in the deepest room,
-  the cell key in the deepest other room
-- town: 2-4 areas (near the start, or a far outpost), one enterable house each
-- forest / ruins mazes at dead ends, with some walls knocked down for loops
-- 1-2 camps; the area outside the dungeon door prefers to be one
+sequence as the Room Scale Lab artifact, so a seed shows the same map in both): the
+tiling, the act order, links inside each piece, the gates and each area's kind.
+What each area holds is rolled from the tables in `data/story.lua` on a sub-seed
+(`world/story.lua`). Each area then builds from its own seed derived from the world
+seed; set `config.SEEDS.<kind>` to build every area of a kind from one fixed seed
+while testing.
 
 ## Repo structure
 
@@ -59,14 +60,16 @@ Each area then builds from its own seed derived from the world seed; set
 source/
   main.lua            imports every module once, runs the active scene
   config.lua          screen layout (12x7 rooms of 32px, 16px HUD), seed overrides
-  core/               rng (seeded xorshift), grid helpers
-  world/              worldgen (the 4x4 map), world (runtime state)
+  core/               rng (seeded xorshift), grid helpers, rules (the rule engine)
+  world/              worldgen (the 4x4 map), story (what each area holds),
+                      objects (object instances and statuses), world (runtime state)
   areas/              layout (shared building blocks), one file per area kind, area (builder)
-  entities/           player, enemy, npc, pickup (chests and items)
+  entities/           player (and items[]), enemy, npc, pickup (items on the ground)
   ui/                 hud, dialogue
   scenes/             explore (gameplay), mapscreen
   tiles/              kits.lua (generated), tileset (image tables)
-  data/text.lua       everything the game says
+  data/               text (everything the game says), items (the item table),
+                      objects (object templates and their rules), story (the story tables)
   audio.lua           sound effects
 tools/
   kits.json           tile picks per area kind (edit in the Kit Builder artifact)
