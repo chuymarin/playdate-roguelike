@@ -1,8 +1,10 @@
 -- The map screen: the 4x4 world on one 400x240 screen, each area 100x60
--- with its tiles at 8px (a quarter of the room size). Only areas you've
--- visited show; the one you're in has a blinking frame. A thick line marks
--- where one act's region meets another's, with a gap at the gate (the gate
--- itself shows locked or open in the area's border). Ⓐ or Ⓑ goes back.
+-- with its tiles at 8px (a quarter of the room size). It shows the layer
+-- you're on (outside, inside, below or above), and only the areas of that
+-- layer you've visited; the one you're in has a blinking frame. A thick
+-- line marks where one act's region meets another's, with a gap at the
+-- gate outside (the gate itself shows locked or open in the area's
+-- border). Ⓐ or Ⓑ goes back.
 
 local gfx <const> = playdate.graphics
 local pd <const> = playdate
@@ -23,6 +25,19 @@ function MapScreen.new(world, explore, onClose)
 	return setmetatable({ world = world, explore = explore, onClose = onClose, frame = 0 }, MapScreen)
 end
 
+-- The areas the map draws: the visited ones on `layer` ("c", "h", "u",
+-- "a"), as a map cell k -> area.
+function MapScreen.shown(world, layer)
+	local out = {}
+	for k = 0, config.MAP * config.MAP - 1 do
+		local area = world.visited[layer .. k] and world.areas[layer .. k]
+		if area then
+			out[k] = area
+		end
+	end
+	return out
+end
+
 function MapScreen:update()
 	self.frame = self.frame + 1
 	if pd.buttonJustPressed(pd.kButtonA) or pd.buttonJustPressed(pd.kButtonB) then
@@ -33,38 +48,37 @@ end
 function MapScreen:draw()
 	gfx.clear(gfx.kColorBlack)
 	local world, here = self.world, self.explore.area
-	for k in pairs(world.visited) do
-		local area = world.areas["c" .. k]
-		if area then
-			local ax = (k % config.MAP) * AREA_W + config.ORIGIN_X // SCALE
-			local ay = (k // config.MAP) * AREA_H + config.ORIGIN_Y // SCALE
-			local function toMap(x, y)
-				return ax + (x - 1) * SMALL, ay + (y - 1) * SMALL
-			end
-			for y = 1, area.rows do
-				for x = 1, area.cols do
-					local tile = area.tiles[y][x]
-					if tile then
-						local px, py = toMap(x, y)
-						tiles.draw(SMALL, tile, px, py)
-					end
+	local layer = here.id:sub(1, 1)
+	local shown = MapScreen.shown(world, layer)
+	for k, area in pairs(shown) do
+		local ax = (k % config.MAP) * AREA_W + config.ORIGIN_X // SCALE
+		local ay = (k // config.MAP) * AREA_H + config.ORIGIN_Y // SCALE
+		local function toMap(x, y)
+			return ax + (x - 1) * SMALL, ay + (y - 1) * SMALL
+		end
+		for y = 1, area.rows do
+			for x = 1, area.cols do
+				local tile = area.tiles[y][x]
+				if tile then
+					local px, py = toMap(x, y)
+					tiles.draw(SMALL, tile, px, py)
 				end
 			end
-			Game.objects.draw(area, world, tiles, SMALL, toMap, true)
-			pickup.draw(area, tiles, Game.kits, toMap, SMALL)
 		end
+		Game.objects.draw(area, world, tiles, SMALL, toMap, true)
+		pickup.draw(area, tiles, Game.kits, toMap, SMALL)
 	end
-	-- region borders: wherever a visited area meets another act's area
+	-- region borders: wherever a shown area meets another act's area
 	local cells = world.gen.cells
 	gfx.setColor(gfx.kColorWhite)
-	for k in pairs(world.visited) do
+	for k in pairs(shown) do
 		local ax, ay = (k % config.MAP) * AREA_W, (k // config.MAP) * AREA_H
 		for _, d in ipairs(Game.grid.DIRS) do
 			local nx, ny = k % config.MAP + d[1], k // config.MAP + d[2]
 			local other = nx >= 0 and ny >= 0 and nx < config.MAP and ny < config.MAP and cells[ny * config.MAP + nx]
 			if other and other.act ~= cells[k].act then
 				-- a gap in the line where the gate is
-				local gap = cells[k].gates[d[3]] and GATE_GAP or 0
+				local gap = layer == "c" and cells[k].gates[d[3]] and GATE_GAP or 0
 				if d[3] == "N" or d[3] == "S" then
 					local y = d[3] == "N" and ay - 1 or ay + AREA_H - 1
 					local half = (AREA_W - gap) // 2
@@ -80,27 +94,17 @@ function MapScreen:draw()
 		end
 	end
 
-	-- where you are: your tile (or the way in, when inside, below or up
-	-- top; on a level spread over from a neighbor's, your spot) and a
-	-- blinking frame
+	-- where you are: your tile and a blinking frame
 	local k = here.cell.k
 	local ax, ay = (k % config.MAP) * AREA_W, (k // config.MAP) * AREA_H
-	local outside = world.areas["c" .. k] -- not built yet when you came in from a neighbor's level
 	local px, py = self.explore.player.x, self.explore.player.y
-	local layer = here.id:sub(1, 1)
-	local below = here.cell.below
-	local way = outside and (layer == "h" and outside.door or layer == "a" and outside.up
-		or layer == "u" and (below.from == "inside" and outside.door or outside.down))
-	if way then
-		px, py = way.x, way.y
-	end
 	if (self.frame // 8) % 2 == 0 then
 		gfx.setColor(gfx.kColorWhite)
 		gfx.drawRect(ax, ay, AREA_W, AREA_H)
-		tiles.draw(SMALL, Game.kits.characters.player[1], ax + config.ORIGIN_X // SCALE + (px - 1) * SMALL, ay + config.ORIGIN_Y // SCALE + (py - 1) * SMALL)
+		tiles.drawSolid(SMALL, Game.kits.characters.player[1], ax + config.ORIGIN_X // SCALE + (px - 1) * SMALL, ay + config.ORIGIN_Y // SCALE + (py - 1) * SMALL)
 	end
 
-	local label = "Seed " .. world.seed
+	local label = Game.text.mapLayers[layer] .. " - Seed " .. world.seed
 	local w = gfx.getTextSize(label) + 12
 	gfx.setColor(gfx.kColorWhite)
 	gfx.fillRect(400 - w - 4, 240 - 24, w, 20)

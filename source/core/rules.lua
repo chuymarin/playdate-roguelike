@@ -2,12 +2,13 @@
 -- an object (the trigger), if its conditions hold, its effects happen;
 -- otherwise its `otherwise` effects do.
 --
---   { on = "bump", when = { has = { "key" } },
+--   { on = "use", when = { has = { "key" } },
 --     does = { take = "key", status = "open" },
 --     otherwise = { say = { "The door is locked." } } }
 --
--- Triggers: use (Ⓐ facing it), bump (walking into it), defeat (an enemy at
--- 0 hit points), enter (walking into its area; not fired yet).
+-- Triggers: use (Ⓐ facing it), bump (walking into it), hit (the sword
+-- swung or the shield raised at it), defeat (an enemy at 0 hit points),
+-- enter (walking into its area; not fired yet).
 --
 -- Conditions (all must hold):
 --   has    = { "key", "lamp" }   carry each listed item

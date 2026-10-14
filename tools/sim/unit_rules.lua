@@ -38,10 +38,13 @@ check(Game.objectKinds.chest.rules[1].does.drop == "{item}", "template untouched
 local gate = objects.add(area, "gate", 1, 4, { lockedTile = 1, openTile = 2, lockedLines = { "Locked." } }, "gate:1-2")
 log = {}
 rules.fire("bump", gate, ctx())
+check(log[1] and log[1]:match("^toast") and objects.status(world, gate) == "blocked", "bumping a gate only hints: " .. table.concat(log, ", "))
+log = {}
+rules.fire("use", gate, ctx())
 check(log[1] == "sound locked" and log[2] == "say Locked." and objects.status(world, gate) == "blocked", "gate otherwise: " .. table.concat(log, ", "))
 p:give("key"); p:give("key")
 log = {}
-rules.fire("bump", gate, ctx())
+rules.fire("use", gate, ctx())
 check(objects.status(world, gate) == "open" and p.items.key == 1, "gate opens, takes one key")
 local other = objects.new("gate", "gate:1-2", 12, 4, { lockedTile = 1, openTile = 2 })
 check(objects.status(world, other) == "open" and not objects.blocks(world, other) and objects.tile(world, other) == 2, "other side of gate is open too")

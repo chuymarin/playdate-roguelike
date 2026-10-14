@@ -23,4 +23,14 @@ function tiles.draw(size, index, x, y, flip)
 	end
 end
 
+-- Draws a tile on a black square: for the hero, enemies, NPCs and items on
+-- the ground, so they don't blend into the floor or a door under them
+-- (tiles are see-through around the drawing). Quick, passing things (the
+-- sword, the shield, hit effects) use tiles.draw.
+function tiles.drawSolid(size, index, x, y, flip)
+	gfx.setColor(gfx.kColorBlack)
+	gfx.fillRect(x, y, size, size)
+	tiles.draw(size, index, x, y, flip)
+end
+
 Game.tiles = tiles

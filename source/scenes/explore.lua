@@ -5,12 +5,16 @@
 -- sword (once you have it). Ⓑ raises the shield (once you have it).
 --
 -- Every interaction goes through the objects' rules (core/rules.lua): Ⓐ
--- fires `use` on the object in front, walking into one fires `bump`, and an
--- enemy at 0 hit points fires `defeat`. This scene only provides what the
+-- fires `use` on the object in front (a gate or cell door opens this way),
+-- walking into one fires `bump` (only a hint), the sword or shield on one
+-- fires `hit` (a secret's cover opens this way), and an enemy at 0 hit
+-- points fires `defeat`. This scene only provides what the
 -- rules act on (makeContext).
 --
 -- Walking off a doorway at the room's edge enters the next area; walking
--- onto a house door goes inside. Enemies come back each time you enter an
+-- onto a house door goes inside. Each move plays a screen transition
+-- (transitions/, picked per kind of move in settings.json); the game waits
+-- while it plays. Enemies come back each time you enter an
 -- area; opened chests and gates and picked-up items don't.
 
 local gfx <const> = playdate.graphics
@@ -45,8 +49,8 @@ local function toScreen(x, y)
 	return config.ORIGIN_X + (x - 1) * config.TILE, config.ORIGIN_Y + (y - 1) * config.TILE
 end
 
--- onEnd: called when the run is over (you won or died); main.lua starts a
--- new world.
+-- onEnd(result): called when the run is over, result "completed" or
+-- "died"; main.lua logs it and goes back to the title screen.
 function Explore.new(world, onEnd)
 	local self = setmetatable({
 		world = world,
@@ -78,7 +82,7 @@ function Explore:enter(id, x, y, facing)
 	p.x, p.y = x, y
 	p:face(facing)
 	p.swing, p.guard = 0, 0
-	self.world.visited[area.cell.k] = true
+	self.world.visited[area.id] = true
 	-- the act's title, the first time you walk into its region
 	local act = area.cell.act
 	if act and not self.world.actsSeen[act] then
@@ -111,7 +115,41 @@ function Explore:leave(dir)
 	local k = self.world:neighbor(area.cell.k, dir)
 	local x = dir == "E" and 1 or dir == "W" and area.cols or p.x
 	local y = dir == "S" and 1 or dir == "N" and area.rows or p.y
-	self:enter(area.id:sub(1, 1) .. k, x, y, dir)
+	self:travel("edge", dir, function()
+		self:enter(area.id:sub(1, 1) .. k, x, y, dir)
+	end)
+end
+
+-- The room as it looks now, without the HUD and messages: for transitions.
+function Explore:snapshot()
+	local image = gfx.image.new(400, 240, gfx.kColorBlack)
+	gfx.pushContext(image)
+	self:drawRoom()
+	gfx.popContext()
+	return image
+end
+
+local function heroCenter(p)
+	local x, y = toScreen(p.x, p.y)
+	return x + config.TILE // 2, y + config.TILE // 2
+end
+
+-- Moves (move() does the entering) with the transition for `kind` ("edge"
+-- or "layer", see transitions/transitions.lua) between how the room looked
+-- and how the new one looks.
+function Explore:travel(kind, dir, move)
+	local from = Game.transitions.enabled and self:snapshot()
+	local fromX, fromY = heroCenter(self.player)
+	move()
+	if not from then
+		return
+	end
+	local toX, toY = heroCenter(self.player)
+	self.transition = Game.transitions.start(kind, from, self:snapshot(), {
+		dir = dir,
+		fromX = fromX, fromY = fromY, toX = toX, toY = toY,
+		room = { x = config.ORIGIN_X, y = config.ORIGIN_Y, w = config.COLS * config.TILE, h = config.ROWS * config.TILE },
+	})
 end
 
 -- ---------- what's where ----------
@@ -236,7 +274,9 @@ function Explore:makeContext()
 		end,
 		win = function()
 			audio.play("win")
-			self:say(text.theEnd, self.onEnd)
+			self:say(text.theEnd, function()
+				self.onEnd("completed")
+			end)
 		end,
 	}
 end
@@ -310,7 +350,29 @@ function Explore:tryMove(dir)
 	local portal = self:portalAt(tx, ty)
 	if portal then
 		audio.play("door")
-		self:enter(portal.to, portal.toX, portal.toY, portal.facing)
+		local from = area.id
+		self:travel("layer", dir, function()
+			self:enter(portal.to, portal.toX, portal.toY, portal.facing)
+			self:openWayBack(from)
+		end)
+	end
+end
+
+-- Like a door left open behind you: arriving through a way (stairs, a cave
+-- mouth) opens the cover on this side of it (a web, a grave, rubble), as
+-- if you had opened it from here. Only the way you came by: a level's
+-- other ways out stay as they are.
+function Explore:openWayBack(from)
+	local area = self.area
+	for _, portal in ipairs(area.portals) do
+		if portal.to == from then
+			for _, obj in ipairs(area.objects) do
+				if obj.template == "secret" and obj.x == portal.x and obj.y == portal.y
+					and objects.status(self.world, obj) == "hidden" then
+					objects.setStatus(self.world, obj, "open")
+				end
+			end
+		end
 	end
 end
 
@@ -342,14 +404,44 @@ end
 
 -- ---------- combat ----------
 
--- Moves an enemy one tile in dir if it can go there; stuns it either way.
+local SIDES <const> = { N = { "E", "W" }, S = { "E", "W" }, E = { "N", "S" }, W = { "N", "S" } }
+
+-- Moves an enemy one tile in dir if it can go there, else one tile to a
+-- side (either, when both are free); stuns it either way.
 function Explore:push(enemy, dir)
-	local d = grid.DELTA[dir]
-	local nx, ny = enemy.x + d[1], enemy.y + d[2]
-	if self:canEnter(nx, ny, enemy) then
-		enemy.x, enemy.y = nx, ny
+	local sides = SIDES[dir]
+	if math.random(2) == 2 then
+		sides = { sides[2], sides[1] }
+	end
+	for _, way in ipairs({ dir, sides[1], sides[2] }) do
+		local d = grid.DELTA[way]
+		local nx, ny = enemy.x + d[1], enemy.y + d[2]
+		if self:canEnter(nx, ny, enemy) then
+			enemy.x, enemy.y = nx, ny
+			break
+		end
 	end
 	enemy:stunFor()
+end
+
+-- A push with the shield (raised into the enemy, or blocking it): enough
+-- pushes on the same enemy (items.json shield.pushesToDefeat) defeat it,
+-- so the shield alone can always clear the way.
+function Explore:shieldPush(enemy, dir)
+	enemy.pushes = (enemy.pushes or 0) + 1
+	local needed = Game.items.shield.pushesToDefeat
+	if needed and enemy.pushes >= needed then
+		for i, other in ipairs(self.enemies) do
+			if other == enemy then
+				audio.play("hit")
+				self:effect("defeat", enemy.x, enemy.y)
+				self:defeatEnemy(enemy, i)
+				return
+			end
+		end
+	end
+	enemy.flash = 12
+	self:push(enemy, dir)
 end
 
 -- A quick effect (kits.effects: hurt, hit, defeat, block) over a cell: its
@@ -362,18 +454,23 @@ function Explore:effect(name, x, y)
 	end
 end
 
+-- Removes a beaten enemy: its remains stay and its `defeat` rule fires.
+function Explore:defeatEnemy(enemy, index)
+	table.remove(self.enemies, index)
+	local bones = Game.kits.objects.remains
+	if bones and #bones > 0 then
+		self.remains[#self.remains + 1] = { x = enemy.x, y = enemy.y, tile = bones[math.random(#bones)] }
+	end
+	enemy.obj.x, enemy.obj.y = enemy.x, enemy.y
+	rules.fire("defeat", enemy.obj, self.ctx)
+end
+
 function Explore:hitEnemy(enemy, index)
 	enemy.hp = enemy.hp - 1
 	audio.play("hit")
 	self:effect(enemy.hp <= 0 and "defeat" or "hit", enemy.x, enemy.y)
 	if enemy.hp <= 0 then
-		table.remove(self.enemies, index)
-		local bones = Game.kits.objects.remains
-		if bones and #bones > 0 then
-			self.remains[#self.remains + 1] = { x = enemy.x, y = enemy.y, tile = bones[math.random(#bones)] }
-		end
-		enemy.obj.x, enemy.obj.y = enemy.x, enemy.y
-		rules.fire("defeat", enemy.obj, self.ctx)
+		self:defeatEnemy(enemy, index)
 	else
 		enemy.flash = 12
 		self:push(enemy, self.player.facing)
@@ -393,10 +490,12 @@ function Explore:hurtPlayer(enemy)
 			self:push(enemy, d[3])
 		end
 	end
-	-- a roguelike: at 0 hearts the run is over and a new world begins
+	-- a roguelike: at 0 hearts the run is over (back to the title screen)
 	if p.hearts <= 0 then
 		audio.play("faint")
-		self:say(text.died, self.onEnd)
+		self:say(text.died, function()
+			self.onEnd("died")
+		end)
 	end
 end
 
@@ -407,7 +506,7 @@ function Explore:attack(enemy, dir)
 	if p.guard > 0 and fx == enemy.x and fy == enemy.y then
 		audio.play("shield")
 		self:effect("block", fx, fy)
-		self:push(enemy, grid.OPP[dir])
+		self:shieldPush(enemy, grid.OPP[dir])
 		return
 	end
 	self:hurtPlayer(enemy)
@@ -416,6 +515,15 @@ end
 function Explore:updateCombat()
 	local p = self.player
 	local fx, fy = p:front()
+	-- the sword or the shield on an object (a secret's cover): once each
+	if p.swing > 0 or p.guard > 0 then
+		local obj = self:objectAt(fx, fy)
+		local struck = p.swing > 0 and self.swingHits or self.guardPushed
+		if obj and not struck[obj] then
+			struck[obj] = true
+			rules.fire("hit", obj, self.ctx)
+		end
+	end
 	if p.swing > 0 then
 		local enemy, index = self:enemyAt(fx, fy)
 		if enemy and not self.swingHits[enemy] then
@@ -426,7 +534,7 @@ function Explore:updateCombat()
 		local enemy = self:enemyAt(fx, fy)
 		if enemy and not self.guardPushed[enemy] then
 			self.guardPushed[enemy] = true
-			self:push(enemy, p.facing)
+			self:shieldPush(enemy, p.facing)
 		end
 	end
 end
@@ -472,6 +580,12 @@ function Explore:update()
 		if e.age >= e.life then
 			table.remove(self.effects, i)
 		end
+	end
+	if self.transition then
+		if self.transition:update() then
+			self.transition = nil
+		end
+		return
 	end
 	if self.dialogue then
 		if self.dialogue:update() then
@@ -519,7 +633,8 @@ function Explore:renderBackground()
 	return image
 end
 
-function Explore:draw()
+-- The room and everything in it (not the HUD or messages).
+function Explore:drawRoom()
 	local kits = Game.kits
 	if not self.background then
 		self.background = self:renderBackground()
@@ -544,6 +659,15 @@ function Explore:draw()
 		tiles.draw(config.TILE, e.frames[math.min(e.age // EFFECT_STEP + 1, #e.frames)], px, py)
 	end
 	gfx.setImageDrawMode(gfx.kDrawModeCopy)
+end
+
+function Explore:draw()
+	local kits = Game.kits
+	if self.transition then
+		self.transition:draw()
+	else
+		self:drawRoom()
+	end
 	Game.hud.draw(self.player, tiles, kits)
 	if self.toastFrames and self.toastFrames > 0 then
 		local w = gfx.getTextSize(self.toastText) + 16

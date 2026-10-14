@@ -52,7 +52,8 @@ local function scan(t)
 end
 scan(Game.text)
 check(longest <= 92, "longest line " .. longest .. " characters")
--- dying ends the run: after the last line a new world begins
+-- dying ends the run: after the last line it's logged and the title
+-- screen comes back
 Game.newWorld(5)
 local before = stub.explore
 before.dialogue = nil
@@ -60,9 +61,51 @@ before.player.hearts = 1
 before.player.invulnerable = 0
 before:hurtPlayer({ x = -9, y = -9 }) -- far off: no knock-back
 check(before.player.hearts == 0 and before.dialogue ~= nil, "dying says so")
+local runs = Game.profile.runs(10)
 for _ = 1, 10 do
-  if stub.explore ~= before then break end
+  if #Game.profile.runs(10) > #runs then break end
   stub.frame({ "A" }); stub.frame({})
 end
-check(stub.explore ~= before, "dying starts a new world")
+local last = Game.profile.parseRun(Game.profile.runs(1)[1] or "")
+check(last.result == "died" and last.hero == "Tester" and last.seed == "seed 5", "dying is logged: " .. tostring(Game.profile.runs(1)[1]))
+stub.frame({}); stub.frame({})
+-- the title screen is up: one more Ⓐ on Start goes to the heroes page,
+-- and Ⓐ on the hero starts a new run
+local e0 = stub.explore
+stub.frame({ "A" }); stub.frame({ "A" })
+check(stub.explore ~= e0 and stub.explore.world.seed ~= nil, "Start, then the hero, starts a new run")
+-- the shield: a blocked push goes to a side; the last push (items.json
+-- shield.pushesToDefeat) defeats
+do
+  local e = stub.explore
+  e.dialogue = nil
+  local a, p = e.area, e.player
+  local saved = {}
+  local function wall(x, y, v) saved[#saved + 1] = { x, y, a.solid[y][x] }; a.solid[y][x] = v end
+  for y = 2, 6 do for x = 3, 7 do wall(x, y, true) end end
+  -- a dead end: player at (4,4) facing E, enemy at (5,4), wall behind it
+  wall(4, 4, false); wall(5, 4, false); wall(5, 3, false)
+  e.enemies = {}
+  p.x, p.y = 4, 4; p:face("E")
+  local en = Game.Enemy.new({ x = 5, y = 4, tile = 1, hp = 1 })
+  en.obj = Game.objects.new("enemy", "enemy:test", 5, 4)
+  e.enemies[1] = en
+  e:shieldPush(en, "E")
+  check(en.x == 5 and en.y == 3, "blocked push goes to the free side: " .. en.x .. "," .. en.y)
+  -- no room anywhere: it stays put, and the last push defeats it
+  local needed = Game.items.shield.pushesToDefeat
+  en.x, en.y = 5, 4; wall(5, 3, true)
+  for _ = 2, needed - 1 do e:shieldPush(en, "E") end
+  check(en.x == 5 and en.y == 4 and #e.enemies == 1, "no room: stays, not yet beaten")
+  e:shieldPush(en, "E")
+  check(#e.enemies == 0, "push " .. needed .. " defeats")
+  -- blocking an attack counts too
+  local en2 = Game.Enemy.new({ x = 5, y = 4, tile = 1, hp = 2 })
+  en2.obj = Game.objects.new("enemy", "enemy:test2", 5, 4)
+  e.enemies = { en2 }
+  p.guard = 5
+  for _ = 1, needed do p.guard = 5; e:attack(en2, "W") end
+  check(#e.enemies == 0 and p.hearts > 0, "blocked attacks count")
+  for i = #saved, 1, -1 do local w = saved[i]; a.solid[w[2]][w[1]] = w[3] end
+end
 print(fails == 0 and ("unit_polish: all passed (" .. seen .. " villagers, longest line " .. longest .. ")") or ("unit_polish: " .. fails .. " failed"))

@@ -18,6 +18,8 @@ if GOD then
   local enter = Game.Explore.enter
   Game.Explore.enter = function(self, ...) enter(self, ...); self.enemies = {} end
 end
+-- dying goes back to the title screen; the bot plays on in a new world
+Game.showTitle = function() Game.newWorld() end
 Game.newWorld(SEED)
 local layout, grid, pickup = Game.layout, Game.grid, Game.pickup
 local E = function() return stub.explore end
@@ -76,6 +78,11 @@ local function step(dir)
     if p:has("sword") then frame({ "A" }); idle(10); dismiss() elseif p:has("shield") then frame({ "B" }); idle(13); dismiss() else idle(5) end
     if tries > 40 then break end
   end
+  -- a locked gate or cell door in the way opens with Ⓐ (bumping only hints)
+  local obj = e:objectAt(p.x + d[1], p.y + d[2])
+  if obj and (obj.kind == "gate" or obj.kind == "cell") then
+    p:face(dir); frame({ "A" }); idle(2); dismiss()
+  end
   local before = E().area.id
   press(dir)
   return E().area.id ~= before
@@ -96,13 +103,16 @@ end
 
 local function walkTo(x, y) return walk(function(a, b) return a == x and b == y end) end
 
-local function faceAndA(x, y)
+-- Walks next to (x, y), faces it and presses a button ("A", or "B" for
+-- the shield, which opens a secret's cover).
+local function faceAnd(button, x, y)
   if not walk(function(a, b) return math.abs(a - x) + math.abs(b - y) == 1 end) then return false end
   local p = E().player
   for _, d in ipairs(grid.DIRS) do if p.x + d[1] == x and p.y + d[2] == y then p:face(d[3]) end end
-  frame({ "A" }); idle(2); dismiss()
+  frame({ button }); idle(button == "B" and 14 or 2); dismiss()
   return true
 end
+local function faceAndA(x, y) return faceAnd("A", x, y) end
 
 local function exitVia(dir)
   local a = E().area
@@ -159,7 +169,7 @@ local function takeWay(way)
   local a = E().area
   for _, sec in ipairs(Game.objects.ofKind(a, "secret")) do
     if sec.x == way.x and sec.y == way.y and Game.objects.status(E().world, sec) == "hidden" then
-      faceAndA(sec.x, sec.y); shot("secret_" .. a.kind)
+      faceAnd("B", sec.x, sec.y); shot("secret_" .. a.kind)
     end
   end
   walkTo(way.x, way.y)
@@ -232,13 +242,11 @@ for _ = 1, 6 do
 end
 shot("goal_room")
 local won = false
-E().onEnd = function() won = true end
+E().onEnd = function(result) won = result == "completed" end
 local cl = Game.objects.ofKind(E().area, "cell")[1]
 if cl then
-  -- walk into the cell door to unlock it
-  walk(function(a, b) return math.abs(a - cl.x) + math.abs(b - cl.y) == 1 end)
-  local p = E().player
-  for _, d in ipairs(grid.DIRS) do if p.x + d[1] == cl.x and p.y + d[2] == cl.y then press(d[3]) end end
+  -- face the cell door and press Ⓐ to unlock it
+  faceAndA(cl.x, cl.y)
   shot("cell_open")
 end
 if E().npcs[1] then faceAndA(E().npcs[1].x, E().npcs[1].y) end

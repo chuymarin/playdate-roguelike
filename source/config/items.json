@@ -1,7 +1,7 @@
 {
   "slots": ["shield", "sword"],
   "order": ["shield", "sword", "key", "cellKey", "coin"],
-  "shield": { "ability": "guard", "lines": "shield" },
+  "shield": { "ability": "guard", "lines": "shield", "pushesToDefeat": 5 },
   "sword": { "ability": "swing", "lines": "sword" },
   "key": { "lines": "key", "consumed": true },
   "cellKey": { "lines": "cellKey", "consumed": true },

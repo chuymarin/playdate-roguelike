@@ -29,11 +29,12 @@ Game.objectKinds = {
 		tiles = { blocked = "{lockedTile}", open = "{openTile}" },
 		rules = {
 			{
-				on = "bump",
+				on = "use",
 				when = { has = { "key" } },
 				does = { take = "key", status = "open", sound = "unlock", toast = text.unlocked },
 				otherwise = { sound = "locked", say = "{lockedLines}" },
 			},
+			{ on = "bump", when = { is = "blocked" }, does = { toast = text.doorHint } },
 		},
 	},
 
@@ -43,11 +44,12 @@ Game.objectKinds = {
 		tiles = { locked = "{lockedTile}", open = "{openTile}" },
 		rules = {
 			{
-				on = "bump",
+				on = "use",
 				when = { has = { "cellKey" } },
 				does = { take = "cellKey", status = "open", sound = "unlock", toast = text.cellOpened },
 				otherwise = { sound = "locked", say = text.cellLocked },
 			},
+			{ on = "bump", when = { is = "locked" }, does = { toast = text.doorHint } },
 		},
 	},
 
@@ -71,16 +73,17 @@ Game.objectKinds = {
 		},
 	},
 
-	-- A grave or a web hiding a way down: walk into it or press Ⓐ on it.
-	-- Open, it shows the stairs (or the cave mouth) under it, which you walk
-	-- onto to go down (the area's portal there); a grave slides aside.
+	-- A grave, rubble or a web hiding a way (stairs, a cave mouth, a
+	-- passage): hit it with the sword or the shield to open it; walking
+	-- into it only hints. Open, it shows what's under it, which you walk
+	-- onto to go through (the area's portal there); a grave slides aside.
 	secret = {
 		status = "hidden",
 		blocks = { hidden = true },
 		tiles = { hidden = "{tile}", open = "{openTile}" },
 		rules = {
-			{ on = "bump", when = { is = "hidden" }, does = { status = "open", shove = "{slides}", sound = "door", toast = "{found}" } },
-			{ on = "use", when = { is = "hidden" }, does = { status = "open", shove = "{slides}", sound = "door", toast = "{found}" } },
+			{ on = "hit", when = { is = "hidden" }, does = { status = "open", shove = "{slides}", sound = "door", toast = "{found}" } },
+			{ on = "bump", when = { is = "hidden" }, does = { toast = text.secretHint } },
 		},
 	},
 

@@ -76,13 +76,20 @@ local gx, gy = cells[1][1], cells[1][2]
 local d = grid.DELTA[grid.OPP[dir]]
 e:enter(a.id, gx + d[1], gy + d[2], dir)
 e.enemies = {}
+e.dialogue = nil
 e:tryMove(dir)
 check(e.area.id == a.id and e.player.x == gx + d[1], "blocked without a key")
-check(e.dialogue ~= nil and e.dialogue.lines[1] == Game.text.gateLocked[1], "says the gate is locked")
-e.dialogue = nil
+check(e.dialogue == nil and e.toastText == Game.text.doorHint, "walking into it only hints")
 e.player:give("key")
 e:tryMove(dir)
-check(e.player.items.key == nil, "the key is used up")
+check(e.player.items.key == 1, "bumping with a key doesn't open it")
+e.player:face(dir); e.player.items.key = nil
+e:pressA()
+check(e.dialogue ~= nil and e.dialogue.lines[1] == Game.text.gateLocked[1], "Ⓐ without a key: it's locked")
+e.dialogue = nil
+e.player:give("key")
+e:pressA()
+check(e.player.items.key == nil, "Ⓐ with the key opens it; the key is used up")
 check(w.status["gate:" .. math.min(gt.from, gt.to) .. "-" .. math.max(gt.from, gt.to)] == "open", "gate open")
 e:tryMove(dir) -- onto the open gate
 check(e.player.x == gx and e.player.y == gy, "walk onto the open gate")

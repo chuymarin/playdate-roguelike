@@ -1,7 +1,8 @@
--- Enemies: step one tile at a time. Within CHASE_RANGE tiles of the player
+-- Enemies: step one tile at a time. Within a few tiles of the player
 -- they walk toward them; otherwise they wander (sometimes standing still).
 -- Walking into the player hurts them, unless the player's shield is up and
--- facing the enemy, which pushes the enemy back instead.
+-- facing the enemy, which pushes the enemy back (or to a side) instead;
+-- enough shield pushes defeat it (scenes/explore.lua shieldPush).
 
 local gfx <const> = playdate.graphics
 local grid <const> = Game.grid
@@ -10,11 +11,8 @@ local config <const> = Game.config
 local Enemy = {}
 Enemy.__index = Enemy
 
-local CHASE_RANGE <const> = 4
-local CHASE_FRAMES <const> = 14
-local WANDER_FRAMES <const> = 24
-local IDLE_CHANCE <const> = 0.3
-local STUN_FRAMES <const> = 20
+-- Timings: config/settings.json, read each time (a difficulty can change
+-- them, data/difficulty.lua).
 
 function Enemy.new(spawn)
 	return setmetatable({
@@ -30,7 +28,7 @@ function Enemy.new(spawn)
 end
 
 function Enemy:stunFor(frames)
-	self.stun = frames or STUN_FRAMES
+	self.stun = frames or config.ENEMY_STUN_FRAMES
 end
 
 -- room: { canEnter(x, y, enemy), player, attack(enemy, dir) }
@@ -48,9 +46,9 @@ function Enemy:update(room)
 	end
 	local p = room.player
 	local dist = math.abs(p.x - self.x) + math.abs(p.y - self.y)
-	local chasing = dist <= CHASE_RANGE
-	self.cooldown = (chasing and CHASE_FRAMES or WANDER_FRAMES) + math.random(0, 6)
-	if not chasing and math.random() < IDLE_CHANCE then
+	local chasing = dist <= config.ENEMY_CHASE_RANGE
+	self.cooldown = (chasing and config.ENEMY_CHASE_FRAMES or config.ENEMY_WANDER_FRAMES) + math.random(0, 6)
+	if not chasing and math.random() < config.ENEMY_IDLE_CHANCE then
 		return
 	end
 
@@ -99,7 +97,7 @@ function Enemy:draw(tiles, toScreen)
 		return
 	end
 	local px, py = toScreen(self.x, self.y)
-	tiles.draw(config.TILE, self.tile, px, py, self.flipX and gfx.kImageFlippedX or gfx.kImageUnflipped)
+	tiles.drawSolid(config.TILE, self.tile, px, py, self.flipX and gfx.kImageFlippedX or gfx.kImageUnflipped)
 end
 
 Game.Enemy = Enemy

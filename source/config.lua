@@ -48,4 +48,13 @@ Game.config = {
 	WALK_REPEAT_DELAY = settings.walkRepeatDelay, -- frames held before walking repeats
 	WALK_REPEAT_EVERY = settings.walkRepeatEvery,
 	EFFECT_FRAME_TIME = settings.effectFrameTime, -- frames each tile of an effect shows
+	SWING_FRAMES = settings.swingFrames, -- the sword stays out
+	GUARD_FRAMES = settings.guardFrames, -- the shield stays up
+	HURT_FRAMES = settings.hurtFrames, -- you blink and can't be hurt again
+	ENEMY_CHASE_RANGE = settings.enemyChaseRange, -- tiles: closer than this, enemies chase
+	ENEMY_CHASE_FRAMES = settings.enemyChaseFrames, -- frames between steps, chasing
+	ENEMY_WANDER_FRAMES = settings.enemyWanderFrames, -- and wandering
+	ENEMY_IDLE_CHANCE = settings.enemyIdleChance, -- a wandering enemy stands still
+	ENEMY_STUN_FRAMES = settings.enemyStunFrames, -- after a push or a hit
+	TRANSITIONS = settings.transitions or {}, -- per kind of move: { effect, frames, ... } (transitions/)
 }

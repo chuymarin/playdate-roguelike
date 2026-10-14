@@ -13,6 +13,8 @@ $LUA unit_gates.lua $SRC 200
 $LUA unit_polish.lua $SRC
 $LUA unit_drops.lua $SRC
 $LUA unit_layers.lua $SRC
+$LUA unit_title.lua $SRC
+$LUA unit_transitions.lua $SRC
 $LUA stress.lua $SRC 500 | tail -2
 wins=0
 for seed in $(seq 1 30); do

@@ -16,7 +16,8 @@
 --                 chance  how often the place gets stairs down (default 1)
 --                 from    "outside" (stairs in the area itself) or
 --                         "inside" (stairs in its building's room)
---                 cover   hides the stairs until you walk into it:
+--                 cover   hides the stairs until you hit it with the
+--                         sword or the shield:
 --                         "grave" (pushed aside), "rubble" (pushed aside),
 --                         "web" (torn; the cave mouth is in the area's
 --                         border), "mouth" (an open cave mouth in the

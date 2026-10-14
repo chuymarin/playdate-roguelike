@@ -36,10 +36,10 @@ source = source or (arg[0]:match("^(.*)[/\\]") or ".") .. "/../source"
 
 dofile((arg[0]:match("^(.*)[/\\]") or ".") .. "/json.lua")(source)
 Game = {}
-local SKIP = { ["CoreLibs/graphics"] = true, ["tiles/tileset"] = true, ["audio"] = true }
+local SKIP = { ["tiles/tileset"] = true, ["audio"] = true, ["core/profile"] = true }
 for line in io.lines(source .. "/main.lua") do
 	local name = line:match('^import "([^"]+)"')
-	if name and not SKIP[name] then
+	if name and not SKIP[name] and not name:match("^CoreLibs/") then
 		if name:match("^entities/") then
 			break -- everything from here on draws or plays
 		end
@@ -159,9 +159,9 @@ local function solve(gen)
 	}
 	local ctx = { player = player, statusOf = function() return nil end }
 	local open, taken = {}, {}
-	local function bumpRule(template)
+	local function openRule(template)
 		for _, rule in ipairs(template.rules) do
-			if rule.on == "bump" then
+			if rule.on == "use" then
 				return rule
 			end
 		end
@@ -195,7 +195,7 @@ local function solve(gen)
 		for _, g in ipairs(closed) do
 			local id = gateId(g[1], g[2])
 			if not open[id] then
-				local rule = bumpRule(g[3])
+				local rule = openRule(g[3])
 				if Game.rules.holds(rule.when, nil, ctx) then
 					open[id] = true
 					if rule.does and rule.does.take then
@@ -221,7 +221,7 @@ local function solve(gen)
 		end
 		local needs = {}
 		for _, g in ipairs(closed) do
-			for k, v in pairs(bumpRule(g[3]).when.has or {}) do
+			for k, v in pairs(openRule(g[3]).when.has or {}) do
 				needs[type(k) == "number" and v or k] = true
 			end
 		end
@@ -240,7 +240,7 @@ local function solve(gen)
 		return ("stuck in act %d: the way on needs %s, carrying %s"):format(
 			top, table.concat(need, " + "), #carry > 0 and table.concat(carry, ", ") or "nothing")
 	end
-	local cellRule = bumpRule(Game.objectKinds.cell)
+	local cellRule = openRule(Game.objectKinds.cell)
 	if not Game.rules.holds(cellRule.when, nil, ctx) then
 		return "reached the captive but can't open the cell"
 	end

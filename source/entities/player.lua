@@ -2,10 +2,12 @@
 -- (items[id] = count, see data/items.lua).
 --
 -- The sword (Ⓐ) appears for a few frames in the tile in front of the
--- player. Its tile points right: facing left it's mirrored, and facing up
--- or down it flips at random every couple of frames, so it looks swung.
+-- player, turned to point your way: facing left or up it's mirrored, and
+-- facing down it's mirrored and flipped upside down.
 -- The shield (Ⓑ) shows in front of the player the same way and pushes an
 -- enemy there one tile back.
+-- Timings: config/settings.json, read each time (a difficulty can change
+-- them, data/difficulty.lua).
 
 local gfx <const> = playdate.graphics
 local grid <const> = Game.grid
@@ -14,10 +16,12 @@ local config <const> = Game.config
 local Player = {}
 Player.__index = Player
 
-local SWING_FRAMES <const> = 9
-local GUARD_FRAMES <const> = 12
-local HURT_FRAMES <const> = 45
-local VERTICAL_FLIPS = { gfx.kImageUnflipped, gfx.kImageFlippedX, gfx.kImageFlippedY, gfx.kImageFlippedXY }
+local SWORD_FLIPS <const> = {
+	E = gfx.kImageUnflipped,
+	W = gfx.kImageFlippedX,
+	N = gfx.kImageFlippedX,
+	S = gfx.kImageFlippedXY,
+}
 
 function Player.new(tile)
 	return setmetatable({
@@ -32,7 +36,6 @@ function Player.new(tile)
 		invulnerable = 0,
 		swing = 0,
 		guard = 0,
-		swordFlip = gfx.kImageUnflipped,
 	}, Player)
 end
 
@@ -85,22 +88,11 @@ function Player:busy()
 end
 
 function Player:startSwing()
-	self.swing = SWING_FRAMES
-	self:pickSwordFlip()
+	self.swing = config.SWING_FRAMES
 end
 
 function Player:startGuard()
-	self.guard = GUARD_FRAMES
-end
-
-function Player:pickSwordFlip()
-	if self.facing == "E" then
-		self.swordFlip = gfx.kImageUnflipped
-	elseif self.facing == "W" then
-		self.swordFlip = gfx.kImageFlippedX
-	else
-		self.swordFlip = VERTICAL_FLIPS[math.random(#VERTICAL_FLIPS)]
-	end
+	self.guard = config.GUARD_FRAMES
 end
 
 -- Returns true if the hit landed (false while still blinking from the last one).
@@ -109,16 +101,13 @@ function Player:hurt()
 		return false
 	end
 	self.hearts = self.hearts - 1
-	self.invulnerable = HURT_FRAMES
+	self.invulnerable = config.HURT_FRAMES
 	return true
 end
 
 function Player:tick()
 	if self.swing > 0 then
 		self.swing = self.swing - 1
-		if (self.facing == "N" or self.facing == "S") and self.swing % 2 == 0 then
-			self:pickSwordFlip()
-		end
 	end
 	if self.guard > 0 then
 		self.guard = self.guard - 1
@@ -131,12 +120,12 @@ end
 function Player:draw(tiles, kits, toScreen)
 	local px, py = toScreen(self.x, self.y)
 	if self.invulnerable == 0 or (self.invulnerable // 3) % 2 == 0 then
-		tiles.draw(config.TILE, self.tile, px, py, self.flipX and gfx.kImageFlippedX or gfx.kImageUnflipped)
+		tiles.drawSolid(config.TILE, self.tile, px, py, self.flipX and gfx.kImageFlippedX or gfx.kImageUnflipped)
 	end
 	local fx, fy = self:front()
 	local sx, sy = toScreen(fx, fy)
 	if self.swing > 0 then
-		tiles.draw(config.TILE, Game.itemTile("sword"), sx, sy, self.swordFlip)
+		tiles.draw(config.TILE, Game.itemTile("sword"), sx, sy, SWORD_FLIPS[self.facing])
 	elseif self.guard > 0 then
 		tiles.draw(config.TILE, Game.itemTile("shield"), sx, sy, self.flipX and gfx.kImageFlippedX or gfx.kImageUnflipped)
 	end

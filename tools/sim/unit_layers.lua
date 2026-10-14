@@ -12,6 +12,17 @@ local fails, passages, secrets, hidden, aligned = 0, 0, 0, 0, 0
 local function check(cond, msg) if not cond then fails = fails + 1; print("FAIL " .. msg) end end
 local grid, objects = Game.grid, Game.objects
 
+-- Hits what's in front of the hero with the shield (Ⓑ) or the sword (Ⓐ).
+local function strike(e, dir, weapon)
+  local p = e.player
+  if not p:has(weapon) then p:give(weapon) end
+  p.swing, p.guard = 0, 0
+  p:face(dir)
+  if weapon == "shield" then e:pressB() else e:pressA() end
+  e:updateCombat()
+  p.swing, p.guard = 0, 0 -- done swinging
+end
+
 for seed = 1, N do
   Game.newWorld(seed)
   local e = stub.explore
@@ -57,7 +68,9 @@ for seed = 1, N do
           e:enter(u.id, bx, by, dir)
           e.dialogue = nil
           e:tryMove(dir)
-          check(objects.status(world, cover) == "open", "hidden passage opens on bump")
+          check(objects.status(world, cover) == "hidden", "walking into a hidden passage doesn't open it")
+          strike(e, dir, "sword")
+          check(objects.status(world, cover) == "open", "the sword opens a hidden passage")
           local other = world:area("u" .. nb)
           for _, sec in ipairs(objects.ofKind(other, "secret")) do
             if sec.id == cover.id then check(objects.status(world, sec) == "open", "the other side opens too") end
@@ -88,7 +101,11 @@ for seed = 1, N do
         local dir
         for _, g in ipairs(grid.DIRS) do if d.frontX + g[1] == sec.x and d.frontY + g[2] == sec.y then dir = g[3] end end
         e:tryMove(dir)
-        check(objects.status(world, sec) == "open", "secret opens on bump")
+        check(objects.status(world, sec) == "hidden", "walking into a secret doesn't open it")
+        e:pressA()
+        check(objects.status(world, sec) == "hidden" or e.player:has("sword"), "Ⓐ alone (no sword) doesn't open it")
+        strike(e, dir, "shield")
+        check(objects.status(world, sec) == "open", "the shield opens a secret")
         e.dialogue = nil
         e:tryMove(dir)
         check(e.area.id == "u" .. k, ("seed %d: walking onto the open way goes down (got %s)"):format(seed, e.area.id))
@@ -97,6 +114,52 @@ for seed = 1, N do
     end
   end
 end
+-- coming up from below through a covered way opens that cover (like a
+-- door left open behind you), and only that one
+local backs = 0
+for seed = 1, N do
+  Game.newWorld(seed)
+  local e = stub.explore
+  local world = e.world
+  for k, cell in pairs(world.gen.cells) do
+    local level = cell.below
+    if level and level.from and level.cover and level.cover ~= "mouth" then
+      local from = world:area((level.from == "inside" and "h" or "c") .. k)
+      local way = from.down
+      local cover
+      for _, sec in ipairs(objects.ofKind(from, "secret")) do
+        if way and sec.x == way.x and sec.y == way.y then cover = sec end
+      end
+      if cover and objects.status(world, cover) == "hidden" then
+        local hiddenBefore = {}
+        for id, a in pairs(world.areas) do
+          for _, sec in ipairs(objects.ofKind(a, "secret")) do
+            if objects.status(world, sec) == "hidden" then hiddenBefore[sec.id] = true end
+          end
+        end
+        local u = world:area("u" .. k)
+        e:enter(u.id, u.entry[1], u.entry[2], "N")
+        e.dialogue = nil
+        local up = u.portals[1]
+        for _, d in ipairs(grid.DIRS) do
+          if u.entry[1] + d[1] == up.x and u.entry[2] + d[2] == up.y then e:tryMove(d[3]) end
+        end
+        check(e.area.id == from.id, ("seed %d: the way up from u%d leads to %s (got %s)"):format(seed, k, from.id, e.area.id))
+        check(objects.status(world, cover) == "open", ("seed %d: leaving u%d by its stairs opens the %s"):format(seed, k, level.cover))
+        check(not objects.at(from, world, way.x, way.y), "nothing blocks the way you came by")
+        for id, a in pairs(world.areas) do
+          for _, sec in ipairs(objects.ofKind(a, "secret")) do
+            if sec ~= cover and hiddenBefore[sec.id] then
+              check(objects.status(world, sec) == "hidden", ("seed %d: %s stays closed"):format(seed, sec.id))
+            end
+          end
+        end
+        backs = backs + 1
+      end
+    end
+  end
+end
+check(backs > 0, "some ways back tested")
 -- the map screen draws from every layer (it marks the way in, or your spot)
 local maps = 0
 for seed = 1, 20 do
@@ -117,10 +180,31 @@ for seed = 1, 20 do
     end
   end
 end
+-- the map shows only the layer you're on, and only its visited areas
+for seed = 1, 20 do
+  Game.newWorld(seed)
+  local e = stub.explore
+  local world = e.world
+  for k, cell in pairs(world.gen.cells) do
+    if cell.below and cell.below.from then
+      local u = world:area("u" .. k)
+      e:enter(u.id, u.entry[1], u.entry[2], "N")
+    end
+  end
+  for _, layer in ipairs({ "c", "h", "u", "a" }) do
+    for k, area in pairs(Game.MapScreen.shown(world, layer)) do
+      check(area.id == layer .. k and world.visited[area.id], ("seed %d: map of %s shows %s"):format(seed, layer, area.id))
+    end
+  end
+  local lows = 0
+  for _ in pairs(Game.MapScreen.shown(world, "u")) do lows = lows + 1 end
+  check(lows > 0, "visited lower levels show on the Below map")
+end
+check(Game.text.mapLayers.u == "Below", "the layers are named")
 check(maps > 0, "map screens tested")
 check(passages > 0, "some passages tested")
 check(secrets > 0, "some secrets tested")
 check(hidden > 0, "some hidden passages tested")
 check(aligned > 0, "some stairs tested")
-print(("unit_layers: %s (%d passages, %d hidden, %d secrets, %d stairs aligned)"):format(fails == 0 and "all passed" or fails .. " failed", passages, hidden, secrets, aligned))
+print(("unit_layers: %s (%d passages, %d hidden, %d secrets, %d ways back, %d stairs aligned)"):format(fails == 0 and "all passed" or fails .. " failed", passages, hidden, secrets, backs, aligned))
 if fails > 0 then os.exit(1) end

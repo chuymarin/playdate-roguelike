@@ -3,5 +3,23 @@
   "seeds": {},
   "walkRepeatDelay": 8,
   "walkRepeatEvery": 5,
-  "effectFrameTime": 4
+  "effectFrameTime": 4,
+  "swingFrames": 9,
+  "guardFrames": 12,
+  "hurtFrames": 45,
+  "enemyChaseRange": 4,
+  "enemyChaseFrames": 14,
+  "enemyWanderFrames": 24,
+  "enemyIdleChance": 0.3,
+  "enemyStunFrames": 20,
+  "transitions": {
+    "edge": { "effect": "slide", "frames": 14 },
+    "layer": { "effect": "fade", "frames": 16, "dither": "bayer8x8" }
+  },
+  "difficulty": "normal",
+  "difficulties": [
+    { "id": "easy", "name": "Easy", "maxHearts": 5, "pushesToDefeat": 3, "enemyChaseFrames": 18 },
+    { "id": "normal", "name": "Normal" },
+    { "id": "hard", "name": "Hard", "maxHearts": 2, "pushesToDefeat": 7, "enemyChaseFrames": 10 }
+  ]
 }

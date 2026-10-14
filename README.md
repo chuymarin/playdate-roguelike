@@ -26,23 +26,36 @@ the act system is in the build: see below.
 
 ## How a run plays (v1)
 
+The game opens on a **title screen**: Start, Settings, Past runs. Start asks you to
+pick a hero, or to make a new one and type their name on the Playdate keyboard.
+Settings has the difficulty (Easy, Normal, Hard: hearts, shield pushes, enemy
+speed; `difficulties` in `config/settings.json`). Each finished run (completed,
+died or quit) is added to `runs.txt` in the game's data folder, with the hero,
+difficulty, seed and the act reached; Past runs shows the latest. When a run
+ends, you're back on the title screen.
+
 1. You wake up at home in Act I's region. The chest there holds a **shield**
-   (Ⓑ: pushes an enemy back one tile). In Act I you can only push enemies away.
+   (Ⓑ: pushes an enemy back one tile, or to a side when it can't go back; five
+   pushes defeat it). In Act I you fight with the shield only.
 2. Every area has a chest. Face one and press Ⓐ: the chest disappears and leaves its
-   item, which you pick up by walking onto it. Each act's region hides the **key** to
+   item, which you pick up by walking onto it. Hidden ways (a web, rubble, a
+   grave over stairs) open when you hit them with the sword or the shield. Each act's region hides the **key** to
    its gate (the chest farthest from where you came in); Act II also hides the
    **sword** (Ⓐ: swing at the tile in front of you). The rest hold **heart containers**.
-3. Walk into a locked gate with a key to open it; the next act's title shows the first
+3. Face a locked gate and press Ⓐ with a key to open it (walking into it only
+   hints); the next act's title shows the first
    time you step into its region. Opened gates stay open.
 4. Villagers in town houses tell you where their region's key and the sword are, and
-   which way the gate is. Camps refill your hearts and become your respawn point.
+   which way the gate is. Camps refill your hearts. At 0 hearts you die and the run
+   is over.
    Defeated enemies drop **coins** (only counted for now).
 5. Act IV: the entrance's chest holds the key to the dungeon door. Inside, the captive is
    locked in a barred cell in the deepest room; another room holds the **cell key**.
    Free them to win.
 
 System menu: **map** (the areas you've visited at 8px per tile, with a line where
-two acts' regions meet) and **new world**.
+two acts' regions meet; only the layer you're on: outside, inside, below or above)
+and **quit run** (back to the title screen).
 
 ## World generation
 

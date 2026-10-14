@@ -287,7 +287,8 @@ function helpers.wayIn(area, ctx, way, anchors, layer)
 	end
 end
 
--- A secret (data/objects.lua) covering stairs: walk into it or press Ⓐ.
+-- A secret (data/objects.lua) covering stairs: hit it with the sword or
+-- the shield.
 -- `slides`: the cover is pushed one cell aside (if there's room) instead
 -- of torn away.
 local function hide(area, ctx, x, y, cover, openTile, slides, found)

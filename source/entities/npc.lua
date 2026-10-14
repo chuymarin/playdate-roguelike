@@ -31,7 +31,7 @@ end
 
 function Npc:draw(tiles, toScreen)
 	local px, py = toScreen(self.x, self.y)
-	tiles.draw(config.TILE, self.obj.sprite, px, py, self.flipX and gfx.kImageFlippedX or gfx.kImageUnflipped)
+	tiles.drawSolid(config.TILE, self.obj.sprite, px, py, self.flipX and gfx.kImageFlippedX or gfx.kImageUnflipped)
 end
 
 Game.Npc = Npc

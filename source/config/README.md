@@ -12,7 +12,7 @@ finished. A file that isn't valid JSON stops the game at startup with
 
 | File | What it controls |
 |---|---|
-| `settings.json` | Hearts, walking speed, effect speed, fixed seeds for testing |
+| `settings.json` | Hearts, walking speed, effect speed, combat timings, how enemies move, fixed seeds for testing |
 | `story.json` | The four acts: which places each rolls, what its chests hold, enemies |
 | `places.json` | Optional places, what each place gets (inside, stairs down or up, chest), how far levels spread, which lower levels connect |
 | `items.json` | What each item does and what it says when you pick it up |
@@ -25,6 +25,25 @@ finished. A file that isn't valid JSON stops the game at startup with
 - `walkRepeatDelay`, `walkRepeatEvery`: frames you hold the d-pad before
   walking repeats, then frames between steps (30 frames = 1 second).
 - `effectFrameTime`: frames each tile of an effect (hit, hurt...) shows.
+- `swingFrames`: frames the sword stays out after Ⓐ.
+- `guardFrames`: frames the shield stays up after Ⓑ.
+- `hurtFrames`: frames you blink after a hit, when you can't be hurt again.
+- `enemyChaseRange`: enemies closer than this many tiles (counted along
+  the grid) walk toward you; farther ones wander.
+- `enemyChaseFrames`, `enemyWanderFrames`: frames between an enemy's steps
+  when chasing and when wandering (plus a random 0-6). Lower is faster.
+- `enemyIdleChance`: how often (0 to 1) a wandering enemy stands still
+  instead of stepping.
+- `enemyStunFrames`: frames an enemy stands stunned after a push or a hit.
+- How many shield pushes defeat an enemy is in `items.json`
+  (`shield.pushesToDefeat`).
+- `difficulty`: the difficulty a new player starts on (`"normal"`); the
+  title screen's Settings changes it, and the choice is saved.
+- `difficulties`: the list Settings steps through, in order. Each has an
+  `id`, a `name` (shown on screen), and any settings it changes: the keys
+  above (`maxHearts`, `enemyChaseFrames`...) and `pushesToDefeat`. What it
+  leaves out stays as written above, so `{"id": "normal", "name":
+  "Normal"}` plays the file as is.
 - `seeds`: build every area of a kind from one seed, to test one design
   everywhere, e.g. `{"cave": 42, "house": 7}`. Kinds: town, ruinedTown,
   church, cemetery, forest, creepyForest, mountain, ruins, camp, entrance,
@@ -91,6 +110,11 @@ finished. A file that isn't valid JSON stops the game at startup with
 - Per item: `ability` (`"swing"` on Ⓐ or `"guard"` on Ⓑ), `consumed`
   (keys), `heart` (one more heart, all refilled), `quiet` (a toast instead
   of a dialogue), `lines` / `toast`: the key in `text.json` of what it says.
+- `pushesToDefeat` (shield): how many shield pushes on one enemy defeat it
+  (5). The shield itself never wears out.
+  Every push counts, whether the enemy was moved or not: raising the
+  shield into it, or blocking its attack. An enemy with no room behind it
+  is pushed to a side instead.
 
 Adding a brand new item also needs a tile slot in the Kit Builder and a
 place in `story.json` chests.
@@ -100,6 +124,8 @@ place in `story.json` chests.
 Every line of dialogue and every toast. A list is shown one line at a time
 (Ⓐ moves on); `%s` in the hint lines is filled in with a place. Ⓐ and Ⓑ are
 the Playdate font's button glyphs.
+`title` holds the title screen's words (menu, headings, hints); `mapLayers`
+the layer names on the map.
 
 ## kits.json
 
@@ -110,5 +136,5 @@ sheet image changes (it also checks every tile here exists).
 
 ## Still in Lua
 
-The object rules (what a chest, gate, secret or NPC does when you bump or
-use it) are in `data/objects.lua`, since they're closer to code.
+The object rules (what a chest, gate, secret or NPC does when you use it
+with Ⓐ, hit it with the sword or shield, or walk into it) are in `data/objects.lua`, since they're closer to code.

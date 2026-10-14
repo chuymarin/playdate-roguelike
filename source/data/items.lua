@@ -5,6 +5,9 @@
 -- Game.itemTile(id), one tile per world from the item's slot in kits.json.
 --
 --   ability   what the item lets a button do: "swing" (Ⓐ) or "guard" (Ⓑ)
+--   pushesToDefeat  (shield) how many pushes on one enemy defeat it,
+--             whether or not it had room to move (the shield itself never
+--             wears out); none: the shield never defeats
 --   consumed  used up by the rule that needs it (keys); informational, the
 --             rule's `take` effect does the removing
 --   heart     taken at once: one more heart to hold, and all refilled
