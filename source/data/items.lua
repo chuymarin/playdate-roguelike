@@ -1,5 +1,7 @@
 -- The item table (Rulebook 3.1): config/items.json, everything the hero
--- can carry. The HUD shows carried items in `order`. Sprites:
+-- can carry. The HUD always shows a slot for each item in `slots` (the
+-- shield and the weapon: empty until found), then the other carried items
+-- in `order`. Sprites:
 -- Game.itemTile(id), one tile per world from the item's slot in kits.json.
 --
 --   ability   what the item lets a button do: "swing" (Ⓐ) or "guard" (Ⓑ)
@@ -14,7 +16,7 @@ local text <const> = Game.text
 
 local items = Game.loadConfig("items")
 for id, def in pairs(items) do
-	if id ~= "order" then
+	if id ~= "order" and id ~= "slots" then
 		for _, field in ipairs({ "lines", "toast" }) do
 			if def[field] then
 				def[field] = assert(text[def[field]], "items.json: " .. id .. "." .. field .. " names no text")

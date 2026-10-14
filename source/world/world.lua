@@ -1,6 +1,6 @@
 -- A running world: the generated map plus everything that changes while
 -- you play (areas built so far, with their opened chests and dropped items,
--- which areas you've seen, object statuses, where you wake up).
+-- which areas you've seen, object statuses).
 
 local worldgen <const> = Game.worldgen
 local config <const> = Game.config
@@ -46,7 +46,6 @@ function World.new(seed)
 		visited = {},
 		actsSeen = {}, -- acts whose region you've walked into (for the banner)
 		status = {}, -- object id -> status (world/objects.lua)
-		respawn = nil, -- { id, x, y }
 	}, World)
 end
 

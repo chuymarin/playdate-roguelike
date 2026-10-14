@@ -25,7 +25,7 @@ local PLACE_NAMES = {
 	forest = "the forest", ruins = "the ruins", town = "a town", camp = "a camp",
 	entrance = "the clearing by the dungeon", dungeon = "the dungeon",
 	ruinedTown = "the ruined town", church = "the church", cemetery = "the cemetery",
-	creepyForest = "the dark woods",
+	creepyForest = "the dark woods", mountain = "the mountain",
 }
 
 -- "the ruins to the north-east", or "this town" for the villager's own cell.
@@ -46,6 +46,8 @@ local function hintLines(ctx, r)
 		local below = gen.cells[k].below
 		if below and gen.cells[k].chestAt == "below" and below.cover then
 			lines[#lines + 1] = text["hint_" .. below.cover]
+		elseif gen.cells[k].chestAt == "above" then
+			lines[#lines + 1] = text.hint_above
 		end
 	end
 	if gen.sword and act <= gen.cells[gen.sword].act then

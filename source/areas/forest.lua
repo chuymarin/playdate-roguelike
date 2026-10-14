@@ -1,7 +1,8 @@
--- Forest, creepy forest and ruins: small mazes. The area's chest ends up
--- in the maze's farthest corner, or down below when the cell has a lower
--- level (data/places.lua): a cave behind a web in the border, or a cellar
--- under rubble you push aside.
+-- Forest, creepy forest, ruins and mountain: small mazes. The area's chest
+-- ends up in the maze's farthest corner, or down below when the cell has a
+-- lower level (data/places.lua): a cave behind a web (a mountain's is
+-- open) in the border, or a cellar under rubble you push aside; or up top
+-- (a mountain's ridge, up the stairs).
 -- Some walls are knocked down (15% of the trees, 30% of the ruin walls,
 -- leaving rubble), which opens loops to run around enemies.
 
@@ -25,7 +26,9 @@ local function build(area, ctx, kit, walls, borderTiles)
 		end
 	end
 	layout.joinOpenings(area)
-	helpers.wayDown(area, ctx, layout.anchors(area))
+	local anchors = layout.anchors(area)
+	helpers.wayDown(area, ctx, anchors)
+	helpers.wayUp(area, ctx, anchors)
 	helpers.placeChest(area, ctx)
 	helpers.spawnEnemies(area, r, ctx.cell.enemies, kit.enemy, 1)
 end
@@ -61,5 +64,21 @@ Game.areaKinds.ruins = {
 		local kit = ctx.kits.ruins
 		area.surface = "concrete"
 		build(area, ctx, kit, kit.wall, kit.wall)
+	end,
+}
+
+-- A maze of cliffs and boulders, an open cave mouth in its border and
+-- stairs up to the ridge (the mountain's upper level).
+Game.areaKinds.mountain = {
+	build = function(area, ctx)
+		local kit = ctx.kits.mountain
+		area.surface = "concrete"
+		build(area, ctx, kit, kit.cliff, kit.border)
+		local anchors = layout.anchors(area)
+		for _, way in ipairs({ area.down, area.up }) do
+			anchors[#anchors + 1] = { way.frontX, way.frontY }
+		end
+		helpers.scatter(area, ctx.r, 0.06, kit.rock, Game.walls.mountain.rock, anchors)
+		helpers.scatter(area, ctx.r, 0.1, kit.decor, Game.walls.mountain.decor, anchors)
 	end,
 }

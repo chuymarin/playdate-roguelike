@@ -75,7 +75,7 @@ end
 -- the builder's anchors so the spot in front of the chest is added to them
 -- and later scattering can't wall it off.
 -- The chest is in one layer (cell.chestAt): each layer on the way there
--- sets area.chestOnward when it built the way on, and places the chest
+-- sets area.chestOnward (to that layer) when it built the way on, and places the chest
 -- itself when it couldn't. `prefer`: cells to try first.
 function helpers.placeChest(area, ctx, anchors, prefer)
 	local cell = ctx.cell
@@ -83,9 +83,11 @@ function helpers.placeChest(area, ctx, anchors, prefer)
 		return nil
 	end
 	if ctx.parent then
-		if not ctx.parent.chestOnward then
+		if ctx.parent.chestOnward ~= area.id:sub(1, 1) then
 			return nil
 		end
+	elseif area.id:sub(1, 1) ~= "c" then
+		return nil -- a level spread over from a neighbor's: the chest isn't here
 	elseif cell.role == "start" then
 		return nil
 	end
@@ -214,38 +216,74 @@ function helpers.placeBuilding(area, r, kit, anchors)
 	return nil
 end
 
--- Where a way leads: "h" the inside, "u" the lower level. Lower levels
--- are entered off-center (x = 3), so the middle of each wall stays free
--- for passages to the neighbors' lower levels.
-local ENTRY_X = { u = 3 }
+-- Where a way leads: "h" the inside, entered from the middle of its
+-- bottom wall; "u" the lower level, whose stairs back up sit on the same
+-- cell as the way down (you arrive on the same spot you stood on).
+local function entryX(area)
+	return layout.midX(area)[1]
+end
 
-local function entryX(area, layer)
-	return ENTRY_X[layer] or layout.midX(area)[1]
+-- The cells a passage between lower or upper levels runs through on this
+-- cell's sides (cell.underLinks, cell.overLinks): the middle of the side,
+-- the cell inside it and one either side. Stairs stay off them, so the
+-- stairs back on the other level never block a passage.
+local function nearPassage(area, cell, x, y)
+	for _, d in ipairs(Game.grid.DIRS) do
+		if (cell.underLinks and cell.underLinks[d[3]]) or (cell.overLinks and cell.overLinks[d[3]]) then
+			for _, c in ipairs(layout.sideCells(area, d[3])) do
+				for i = 0, 1 do
+					local px, py = c[1] - d[1] * i, c[2] - d[2] * i
+					if math.abs(px - x) + math.abs(py - y) <= 1 then
+						return true
+					end
+				end
+			end
+		end
+	end
+	return false
+end
+helpers.nearPassage = nearPassage
+
+-- The direction from (x, y) to the neighboring cell (tx, ty).
+local function dirTo(x, y, tx, ty)
+	for _, d in ipairs(Game.grid.DIRS) do
+		if x + d[1] == tx and y + d[2] == ty then
+			return d[3]
+		end
+	end
+	return "N"
 end
 
 -- Makes `way` (a cell walked onto to go through, and the spot in front of
--- it) the way into this cell's inside (layer "h", area.door) or lower
--- level ("u", area.down): a portal there, the front kept clear and added
--- to the anchors. Sets chestOnward when the chest lies that way.
+-- it) the way into this cell's inside (layer "h", area.door), lower level
+-- ("u", area.down) or upper level ("a", area.up): a portal there, the
+-- front kept clear and added to the anchors. Sets chestOnward (to the layer) when the
+-- chest lies that way.
 function helpers.wayIn(area, ctx, way, anchors, layer)
 	layer = layer or "h"
 	if layer == "h" then
 		area.door = way
-	else
+	elseif layer == "u" then
 		area.down = way
+	else
+		area.up = way
 	end
 	area.reserved[layout.key(way.frontX, way.frontY)] = true
 	if anchors then
 		anchors[#anchors + 1] = { way.frontX, way.frontY }
 	end
-	area.portals[#area.portals + 1] = {
-		x = way.x, y = way.y, to = layer .. ctx.cell.k, toX = entryX(area, layer), toY = area.rows - 1, facing = "N",
-	}
+	local portal = { x = way.x, y = way.y, to = layer .. ctx.cell.k, toX = entryX(area), toY = area.rows - 1, facing = "N" }
+	if layer ~= "h" then
+		portal.toX, portal.toY = way.frontX, way.frontY
+		portal.facing = dirTo(way.x, way.y, way.frontX, way.frontY)
+	end
+	area.portals[#area.portals + 1] = portal
 	local cell = ctx.cell
 	local towardInside = layer == "h" and (cell.chestAt == "inside" or (cell.chestAt == "below" and cell.below.from == "inside"))
 	local towardBelow = layer == "u" and cell.chestAt == "below"
-	if towardInside or towardBelow then
-		area.chestOnward = true
+	local towardAbove = layer == "a" and cell.chestAt == "above"
+	if towardInside or towardBelow or towardAbove then
+		area.chestOnward = layer
 	end
 end
 
@@ -275,7 +313,19 @@ end
 -- under the cell's cover (a grave, rubble) or in plain sight. Returns
 -- true when placed.
 function helpers.stairsDown(area, ctx, cells, anchors)
-	local c = layout.claimSolid(area, cells, anchors)
+	return helpers.stairs(area, ctx, cells, anchors, "u")
+end
+
+-- Stairs to the cell's lower ("u") or upper ("a") level; see stairsDown.
+-- Stairs up are never hidden.
+function helpers.stairs(area, ctx, cells, anchors, layer)
+	local clear = {}
+	for _, c in ipairs(cells) do
+		if not nearPassage(area, ctx.cell, c[1], c[2]) then
+			clear[#clear + 1] = c
+		end
+	end
+	local c = layout.claimSolid(area, clear, anchors)
 	if not c then
 		return false
 	end
@@ -284,15 +334,31 @@ function helpers.stairsDown(area, ctx, cells, anchors)
 		area.occupied[layout.key(c[1], c[2])] = nil
 		return false
 	end
-	local stairs = rng.pick(ctx.r, ctx.kits.objects.stairsDown)
-	local cover = coverTile(ctx, ctx.cell.below.cover)
+	local up = layer == "a"
+	local stairs = rng.pick(ctx.r, up and ctx.kits.objects.stairsUp or ctx.kits.objects.stairsDown)
+	local cover = not up and coverTile(ctx, ctx.cell.below.cover)
 	if cover then
 		hide(area, ctx, c[1], c[2], cover, stairs, true, Game.text.foundStairs)
 	else
 		layout.set(area, c[1], c[2], stairs, false)
 	end
-	helpers.wayIn(area, ctx, { x = c[1], y = c[2], frontX = spot[1], frontY = spot[2] }, anchors, "u")
+	helpers.wayIn(area, ctx, { x = c[1], y = c[2], frontX = spot[1], frontY = spot[2] }, anchors, layer)
 	return true
+end
+
+-- Stairs up to the cell's upper level (cell.above, when it has its own
+-- way up) on the free cell farthest from `from`. Returns true when placed.
+function helpers.wayUp(area, ctx, anchors, from)
+	local above = ctx.cell.above
+	if not above or not above.from then
+		return false
+	end
+	local free = layout.freeCells(area, from or anchors)
+	local far = {}
+	for i = #free, 1, -1 do
+		far[#far + 1] = free[i]
+	end
+	return helpers.stairs(area, ctx, far, anchors, "a")
 end
 
 -- Stairs down on the free cell farthest from the cells `from`.
@@ -305,9 +371,10 @@ function helpers.farStairsDown(area, ctx, anchors, from)
 	return helpers.stairsDown(area, ctx, far, anchors)
 end
 
--- A cave mouth in the north (else south) border, covered by a web, next
--- to a walkable cell the anchors reach, away from the doorways: the
--- farthest such spot. Leads to the lower level. Returns true when placed.
+-- A cave mouth in the north (else south) border, covered by a web (or
+-- left open, cover "mouth"), next to a walkable cell the anchors reach,
+-- away from the doorways: the farthest such spot. Leads to the lower
+-- level. Returns true when placed.
 function helpers.hiddenCave(area, ctx, anchors)
 	local r, kit = ctx.r, ctx.kits.cave
 	local dist = layout.reach(area, anchors, area.occupied)
@@ -323,6 +390,7 @@ function helpers.hiddenCave(area, ctx, anchors)
 			end
 			local k = layout.key(x, iy)
 			local d = dist[k]
+			clear = clear and not nearPassage(area, ctx.cell, x, y) and not nearPassage(area, ctx.cell, x, iy)
 			if d and clear and not area.occupied[k] and not area.spawnTaken[k] and (not bestD or d > bestD) then
 				best, bestD = { x, y, iy }, d
 			end
@@ -343,20 +411,25 @@ function helpers.hiddenCave(area, ctx, anchors)
 	end
 	area.occupied[layout.key(x, y)] = true
 	local web = ctx.kits.objects.web
-	hide(area, ctx, x, y, #web > 0 and rng.pick(r, web) or nil, rng.pick(r, kit.mouth), false, Game.text.foundCave)
+	if ctx.cell.below.cover == "web" then
+		hide(area, ctx, x, y, #web > 0 and rng.pick(r, web) or nil, rng.pick(r, kit.mouth), false, Game.text.foundCave)
+	else
+		layout.set(area, x, y, rng.pick(r, kit.mouth), false) -- an open cave mouth
+	end
 	helpers.wayIn(area, ctx, { x = x, y = y, frontX = x, frontY = iy }, anchors, "u")
 	return true
 end
 
 -- The way down, when this cell's stairs are out here (data/places.lua
--- from = "outside"): a web in the border, or stairs (maybe under a cover)
--- on the free cell farthest from the anchors. Returns true when placed.
+-- from = "outside"): a cave mouth in the border (maybe behind a web), or
+-- stairs (maybe under a cover) on the free cell farthest from the
+-- anchors. Returns true when placed.
 function helpers.wayDown(area, ctx, anchors)
 	local below = ctx.cell.below
 	if not below or below.from ~= "outside" then
 		return false
 	end
-	if below.cover == "web" then
+	if below.cover == "web" or below.cover == "mouth" then
 		return helpers.hiddenCave(area, ctx, anchors)
 	end
 	return helpers.farStairsDown(area, ctx, anchors, anchors)
@@ -385,29 +458,85 @@ local function rect(floor, x0, y0, x1, y1)
 	end
 end
 
--- An L-shaped corridor from a to b.
-local function corridor(floor, r, a, b)
-	local x, y = a[1], a[2]
-	mark(floor, x, y)
+-- The cells of an L-shaped path from a to b, along x first or y first.
+local function lPath(a, b, xFirst)
+	local out, x, y = { { a[1], a[2] } }, a[1], a[2]
 	local function stepX()
 		while x ~= b[1] do
 			x = x + (b[1] > x and 1 or -1)
-			mark(floor, x, y)
+			out[#out + 1] = { x, y }
 		end
 	end
 	local function stepY()
 		while y ~= b[2] do
 			y = y + (b[2] > y and 1 or -1)
-			mark(floor, x, y)
+			out[#out + 1] = { x, y }
 		end
 	end
-	if r() < 0.5 then
+	if xFirst then
 		stepX()
 		stepY()
 	else
 		stepY()
 		stepX()
 	end
+	return out
+end
+
+-- A corridor from a to b: an L, never through a cell in `avoid` (the
+-- stairs back up, which you can't walk across). When both Ls cross one,
+-- the shortest way around inside the border.
+local function corridor(floor, r, a, b, area, avoid)
+	local first = r() < 0.5
+	for _, xFirst in ipairs({ first, not first }) do
+		local cells, ok = lPath(a, b, xFirst), true
+		for _, c in ipairs(cells) do
+			if avoid and avoid[layout.key(c[1], c[2])] then
+				ok = false
+			end
+		end
+		if ok then
+			for _, c in ipairs(cells) do
+				mark(floor, c[1], c[2])
+			end
+			return
+		end
+	end
+	local prev, q, head = { [layout.key(a[1], a[2])] = false }, { a }, 1
+	while head <= #q do
+		local c = q[head]
+		head = head + 1
+		if c[1] == b[1] and c[2] == b[2] then
+			break
+		end
+		for _, d in ipairs(Game.grid.DIRS) do
+			local nx, ny = c[1] + d[1], c[2] + d[2]
+			local k = layout.key(nx, ny)
+			if prev[k] == nil and not avoid[k] and nx > 1 and ny > 1 and nx < area.cols and ny < area.rows then
+				prev[k] = c
+				q[#q + 1] = { nx, ny }
+			end
+		end
+	end
+	local c = prev[layout.key(b[1], b[2])] ~= nil and b or nil
+	while c do
+		mark(floor, c[1], c[2])
+		c = prev[layout.key(c[1], c[2])]
+	end
+end
+
+-- (x, y), or the nearest cell beside it, when it's one to avoid (the
+-- stairs back up): where corridors meet.
+local function meetAt(x, y, avoid)
+	if not avoid[layout.key(x, y)] then
+		return { x, y }
+	end
+	for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, -1 }, { 0, 1 }, { 1, -1 }, { -1, -1 } }) do
+		if not avoid[layout.key(x + d[1], y + d[2])] then
+			return { x + d[1], y + d[2] }
+		end
+	end
+	return { x, y }
 end
 
 -- Each shape fills `floor` and returns its middle (corridors lead there).
@@ -444,12 +573,13 @@ function SHAPES.cave(floor, area, r, must)
 	local w, h = rng.int(r, 2, 4), rng.int(r, 2, 3)
 	local x0, y0 = mx - rng.int(r, 0, w - 1), my - rng.int(r, 0, h - 1)
 	rect(floor, x0, y0, x0 + w - 1, math.min(y0 + h - 1, area.rows - 2))
-	local hub = { mx, my }
+	local hub = meetAt(mx, my, must.avoid)
+	mark(floor, hub[1], hub[2])
 	for _ = 1, rng.int(r, 1, 2) do
 		local cw, ch = rng.int(r, 2, 3), 2
 		local cx, cy = rng.int(r, 2, area.cols - cw), rng.int(r, 2, area.rows - 1 - ch)
 		rect(floor, cx, cy, cx + cw - 1, cy + ch - 1)
-		corridor(floor, r, { cx, cy }, hub)
+		corridor(floor, r, { cx, cy }, hub, area, must.avoid)
 	end
 	return hub
 end
@@ -497,35 +627,69 @@ function helpers.shapedRoom(area, ctx, opts)
 	local r = ctx.r
 	local layer = area.id:sub(1, 1)
 	area.interior = true
-	local ex = entryX(area, layer)
-	local exits = { ex }
-	if opts.wide then
-		exits[2] = ex + 1
+	-- passages to the neighbors' levels on this layer (below: cell.underLinks,
+	-- above: cell.overLinks), through the middle of a side
+	local sideLinks = layer == "u" and ctx.cell.underLinks or layer == "a" and ctx.cell.overLinks or {}
+	local links = {}
+	for _, d in ipairs(Game.grid.DIRS) do
+		local link = sideLinks[d[3]]
+		if link then
+			local cells = layout.sideCells(area, d[3])
+			links[#links + 1] = { dir = d[3], d = d, cells = cells, link = link, inner = { cells[1][1] - d[1], cells[1][2] - d[2] } }
+		end
+	end
+	-- the way back: an inside's is in the middle of the bottom wall; a
+	-- lower or upper level's on the cell of the stairs it came from,
+	-- entered from the same side (a cave mouth in the border stays in the
+	-- border); a level spread over from a neighbor's has none, you come in
+	-- through its first passage
+	local way = nil
+	if ctx.parent then
+		way = layer == "h" and ctx.parent.door or layer == "u" and ctx.parent.down or ctx.parent.up
+	end
+	local exits, entry
+	if layer ~= "h" and way then
+		exits = { { way.x, way.y } }
+		entry = { way.frontX, way.frontY }
+	elseif layer ~= "h" and #links > 0 then
+		exits = {}
+		entry = links[1].inner
+	else
+		local ex = entryX(area)
+		exits = { { ex, area.rows } }
+		if opts.wide then
+			exits[2] = { ex + 1, area.rows }
+		end
+		entry = { ex, area.rows - 1 }
+	end
+	local inward = {} -- for each exit, the cell you step onto from it
+	for i, e in ipairs(exits) do
+		inward[i] = { e[1] + entry[1] - exits[1][1], e[2] + entry[2] - exits[1][2] }
 	end
 	local floor = {}
-	local must = { { ex, area.rows - 1 } }
-	local links = {}
-	if layer == "u" then
-		for _, d in ipairs(Game.grid.DIRS) do
-			local link = ctx.cell.underLinks and ctx.cell.underLinks[d[3]]
-			if link then
-				local cells = layout.sideCells(area, d[3])
-				links[#links + 1] = { dir = d[3], d = d, cells = cells, link = link }
-				for _, c in ipairs(cells) do
-					mark(floor, c[1], c[2])
-					mark(floor, c[1] - d[1], c[2] - d[2])
-				end
-				must[#must + 1] = { cells[1][1] - d[1], cells[1][2] - d[2] }
-			end
+	local must = { entry, avoid = {} }
+	for _, e in ipairs(exits) do
+		must.avoid[layout.key(e[1], e[2])] = true
+	end
+	for _, l in ipairs(links) do
+		for _, c in ipairs(l.cells) do
+			mark(floor, c[1], c[2])
+			mark(floor, c[1] - l.d[1], c[2] - l.d[2])
+		end
+		must[#must + 1] = l.inner
+		if l.link.covered then
+			-- a hidden passage only leads on: the room's own corridors go around it
+			must.avoid[layout.key(l.inner[1], l.inner[2])] = true
 		end
 	end
 	local hub = SHAPES[opts.shape](floor, area, r, must)
+	hub = meetAt(hub[1], hub[2], must.avoid)
 	for _, p in ipairs(must) do
-		corridor(floor, r, p, hub)
+		corridor(floor, r, p, hub, area, must.avoid)
 	end
-	for _, x in ipairs(exits) do
-		mark(floor, x, area.rows - 1)
-		mark(floor, x, area.rows)
+	for i, e in ipairs(exits) do
+		mark(floor, e[1], e[2])
+		mark(floor, inward[i][1], inward[i][2])
 	end
 	-- draw: floor, walls around it, the dark beyond
 	for y = 1, area.rows do
@@ -546,28 +710,32 @@ function helpers.shapedRoom(area, ctx, opts)
 		end
 	end
 	-- the way back up
-	local way = layer == "h" and ctx.parent.door or ctx.parent.down
-	for _, x in ipairs(exits) do
-		layout.set(area, x, area.rows, rng.pick(r, opts.exit), false)
+	for i, e in ipairs(exits) do
+		layout.set(area, e[1], e[2], rng.pick(r, opts.exit), false)
+		area.occupied[layout.key(e[1], e[2])] = true
 		if way then
-			area.portals[#area.portals + 1] = { x = x, y = area.rows, to = ctx.parent.id, toX = way.frontX, toY = way.frontY, facing = "S" }
+			area.portals[#area.portals + 1] = {
+				x = e[1], y = e[2], to = ctx.parent.id, toX = way.frontX, toY = way.frontY,
+				facing = dirTo(way.x, way.y, way.frontX, way.frontY),
+			}
 		end
-		area.reserved[layout.key(x, area.rows - 1)] = true
+		area.reserved[layout.key(inward[i][1], inward[i][2])] = true
 	end
-	area.entry = { ex, area.rows - 1 }
+	area.entry = entry
 	area.hub = area.entry -- enemies spawn away from it (layout.spawnCells)
 	-- the room's middle is an anchor too, and the cells where the way in
 	-- opens into the room stay clear: nothing may cut the room off
-	local anchors = { { ex, area.rows }, area.entry }
+	local anchors = { area.entry } -- reach starts here: never across the stairs
 	if floor[layout.key(hub[1], hub[2])] then
 		anchors[#anchors + 1] = hub
 	end
-	for _, x in ipairs(exits) do
-		if floor[layout.key(x, area.rows - 2)] then
-			area.reserved[layout.key(x, area.rows - 2)] = true
+	for i, e in ipairs(exits) do
+		local bx, by = 2 * inward[i][1] - e[1], 2 * inward[i][2] - e[2]
+		if floor[layout.key(bx, by)] then
+			area.reserved[layout.key(bx, by)] = true
 		end
 	end
-	-- passages to the neighbors' lower levels, some behind a secret
+	-- the passages, some behind a secret
 	for _, l in ipairs(links) do
 		area.openings[l.dir] = l.cells
 		local first = l.cells[1]

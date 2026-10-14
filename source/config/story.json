@@ -8,7 +8,8 @@
         ["camp", 1],
         ["town", 1],
         ["church", 0.6],
-        ["cemetery", 0.6]
+        ["cemetery", 0.6],
+        ["mountain", 0.5]
       ],
       "camps": 1,
       "chests": [
@@ -27,7 +28,8 @@
         ["ruinedTown", 1],
         ["church", 0.5],
         ["cemetery", 1],
-        ["creepyForest", 0.7]
+        ["creepyForest", 0.7],
+        ["mountain", 1]
       ],
       "camps": 1,
       "chests": [
@@ -44,7 +46,8 @@
         ["camp", 1],
         ["ruinedTown", 1],
         ["cemetery", 1],
-        ["creepyForest", 1]
+        ["creepyForest", 1],
+        ["mountain", 1]
       ],
       "camps": 1,
       "chests": [
@@ -72,7 +75,10 @@
     "ruinedHouse": { "min": 0, "max": 1, "chance": 0.5 },
     "crypt": { "min": 1, "max": 1 },
     "cave": { "min": 1, "max": 1 },
-    "cellar": { "min": 0, "max": 1, "chance": 0.6 }
+    "cellar": { "min": 0, "max": 1, "chance": 0.6 },
+    "mountain": { "min": 1, "max": 2, "chance": 0.4 },
+    "ridge": { "min": 0, "max": 1, "chance": 0.6 },
+    "tower": { "min": 1, "max": 1 }
   },
   "firstAct": 1,
   "alone": ["sword"]

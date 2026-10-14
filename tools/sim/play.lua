@@ -165,11 +165,11 @@ local function takeWay(way)
   walkTo(way.x, way.y)
   return E().area ~= a
 end
--- the chest is inside or below (data/places.lua): go there, open it, come back up
+-- the chest is inside, below or up top (data/places.lua): go there, open it, come back
 local function openChestInside()
   local a = E().area
   if not a.chestOnward then return end
-  local way = a.cell.chestAt == "below" and a.cell.below.from == "outside" and a.down or a.door
+  local way = a.chestOnward == "a" and a.up or a.chestOnward == "u" and a.down or a.door
   if not (way and takeWay(way)) then return end
   local h = E().area
   if h.chestOnward and h.down then takeWay(h.down) end
@@ -232,7 +232,7 @@ for _ = 1, 6 do
 end
 shot("goal_room")
 local won = false
-E().onWin = function() won = true end
+E().onEnd = function() won = true end
 local cl = Game.objects.ofKind(E().area, "cell")[1]
 if cl then
   -- walk into the cell door to unlock it
@@ -245,5 +245,6 @@ if E().npcs[1] then faceAndA(E().npcs[1].x, E().npcs[1].y) end
 stub.menu["map"](); idle(); shot("map")
 log[#log + 1] = "faints " .. faintCount()
 log[#log + 1] = ("gate %s cell %s | won %s | hearts %d/%d | frames %d | sounds %d"):format(tostring(E().world.status["gate:" .. math.min(gen.dungeonDoor.inside, gen.dungeonDoor.outside) .. "-" .. math.max(gen.dungeonDoor.inside, gen.dungeonDoor.outside)]), tostring(E().world.status["cell:" .. gen.goal]), tostring(won), E().player.hearts, E().player.maxHearts, frames, #stub.sounds)
+if VERBOSE then print("ended in", E().area.id, E().area.kind, #E().area.portals) end
 print("seed " .. E().world.seed .. ": " .. table.concat(log, " | "))
 if OUT then local f = io.open(OUT .. "/shots.txt", "w"); f:write(table.concat(shots, "\n")); f:close() end

@@ -12,6 +12,11 @@
 --   cave         chambers and corridors, rocks and bones (behind a web in a
 --                forest)
 --   cellar       the same shape, rubble (under ruins or a ruined house)
+-- Upper levels ("a", up the stairs), stairs back down where you came up:
+--   ridge        the top of a mountain: open rock in the sky, boulders
+--   tower        over the dungeon: stone halls, pillars, tougher enemies
+-- A lower or upper level can spread over its neighbors' cells in the same
+-- act (world/story.lua): those have no stairs, only passages.
 -- Ruined houses, caves and cellars draw their walls with the build
 -- template (kits.build: a piece for each side the floor is on).
 
@@ -135,5 +140,32 @@ Game.areaKinds.cellar = {
 		helpers.spawnEnemies(area, r, ctx.cell.belowEnemies or 0, kit.enemy, 1)
 		helpers.scatter(area, r, 0.12, kit.rubble, false, anchors)
 		helpers.scatter(area, r, 0.06, ctx.kits.dungeon.decor, Game.walls.dungeon.decor, anchors)
+	end,
+}
+
+Game.areaKinds.ridge = {
+	build = function(area, ctx)
+		local r, kit = ctx.r, ctx.kits.ridge
+		area.surface = "grass"
+		local anchors = helpers.shapedRoom(area, ctx, { shape = "cave", walls = kit.edge, exit = ctx.kits.objects.stairsDown })
+		chest(area, ctx, anchors)
+		helpers.spawnEnemies(area, r, ctx.cell.aboveEnemies or 0, kit.enemy, 1)
+		for _, s in ipairs(area.enemySpawns) do
+			anchors[#anchors + 1] = { s.x, s.y }
+		end
+		helpers.scatter(area, r, 0.08, kit.rock, Game.walls.ridge.rock, anchors)
+		helpers.scatter(area, r, 0.12, kit.decor, Game.walls.ridge.decor, anchors)
+	end,
+}
+
+Game.areaKinds.tower = {
+	build = function(area, ctx)
+		local r, kit = ctx.r, ctx.kits.tower
+		area.surface = "concrete"
+		local anchors = helpers.shapedRoom(area, ctx, { shape = "crypt", walls = kit.wall, exit = ctx.kits.objects.stairsDown })
+		chest(area, ctx, anchors)
+		helpers.spawnEnemies(area, r, ctx.cell.aboveEnemies or 0, kit.enemy, 2)
+		helpers.scatter(area, r, 0.1, kit.pillar, Game.walls.tower.pillar, anchors)
+		helpers.scatter(area, r, 0.06, kit.decor, Game.walls.tower.decor, anchors)
 	end,
 }

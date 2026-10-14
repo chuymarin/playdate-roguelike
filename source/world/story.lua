@@ -15,6 +15,8 @@ local story = {}
 
 local SALT <const> = 7
 local FEATURES_SALT <const> = 14
+local LEVELS_SALT <const> = 15
+local GROW_CHANCE <const> = 0.6 -- each extra cell a level spreads over
 
 -- How many enemies a kind of area gets (the story's enemy table), capped in
 -- Act I and next to an item that wants to be alone.
@@ -38,10 +40,55 @@ local function enemyCount(r, tables, kind, cell, alone)
 	return n
 end
 
+-- Spreads the level `layer` ("below" / "above") of cell k0 over cells
+-- linked to it in the same act's piece (so the level has part of the
+-- piece's shape), up to spec.spread more, of the kinds in spec.over, never
+-- the entrance or the captive's room or a cell that has that level
+-- already. A spread-to cell has no way there of its own: you walk in from
+-- k0's level, through passages along the piece's links (cell.underLinks
+-- below, cell.overLinks above).
+local function grow(gen, r, k0, layer, spec)
+	local MAP <const> = Game.config.MAP
+	local cells = gen.cells
+	local act = cells[k0].act
+	local over = {}
+	for _, kind in ipairs(spec.over or {}) do
+		over[kind] = true
+	end
+	local group = { k0 }
+	local linksKey = layer == "below" and "underLinks" or "overLinks"
+	for _ = 1, spec.spread or 0 do
+		if r() >= GROW_CHANCE then
+			break
+		end
+		local options = {}
+		for _, k in ipairs(group) do
+			for _, d in ipairs(grid.DIRS) do
+				local n = k + d[1] + d[2] * MAP
+				local other = cells[k].links[d[3]] and cells[n]
+				if other and other.act == act and over[other.kind] and not other[layer] and n ~= gen.goal and other.role ~= "entrance" then
+					options[#options + 1] = { k, n, d[3] }
+				end
+			end
+		end
+		if #options == 0 then
+			break
+		end
+		local o = rng.pick(r, options)
+		local other = cells[o[2]]
+		other[layer] = { kind = spec.kind, root = k0 }
+		cells[o[1]][linksKey][o[3]] = {}
+		other[linksKey][grid.OPP[o[3]]] = {}
+		group[#group + 1] = o[2]
+	end
+end
+
 -- Each area's features (data/places.lua), on its own sub-seed: its inside
 -- (cell.inside, insideEnemies), its lower level (cell.below = { kind,
--- from, cover }, belowEnemies), where its chest is (cell.chestAt), then the
--- passages between neighboring lower levels (cell.underLinks[dir]).
+-- from, cover }, belowEnemies), its upper level (cell.above = { kind,
+-- from }, aboveEnemies), each level maybe spread over its neighbors
+-- (grow), where its chest is (cell.chestAt), then the passages between
+-- neighboring lower levels (cell.underLinks[dir]).
 local function rollFeatures(gen, tables, alone)
 	local places = Game.places
 	local r = rng.new(rng.derive(gen.seed, FEATURES_SALT))
@@ -50,6 +97,7 @@ local function rollFeatures(gen, tables, alone)
 		local cell = gen.cells[k]
 		local f = places.features[cell.kind]
 		cell.underLinks = {}
+		cell.overLinks = {}
 		if f then
 			if f.inside and r() < (f.insideChance or 1) then
 				cell.inside = f.inside
@@ -57,18 +105,56 @@ local function rollFeatures(gen, tables, alone)
 			if f.below and r() < (f.below.chance or 1) and (f.below.from ~= "inside" or cell.inside) then
 				cell.below = { kind = f.below.kind, from = f.below.from or "outside", cover = f.below.cover }
 			end
-			if cell.chest and cell.role ~= "start" and f.chest then
-				local at = f.chest
-				if at == "deepest" then
-					at = cell.below and "below" or "inside"
-				end
-				if (at == "inside" and cell.inside) or (at == "below" and cell.below) then
-					cell.chestAt = at
-				end
-			end
 			local notGoal = k ~= gen.goal
 			cell.insideEnemies = cell.inside and notGoal and enemyCount(r, tables, cell.inside, cell, alone) or 0
 			cell.belowEnemies = cell.below and notGoal and enemyCount(r, tables, cell.below.kind, cell, alone) or 0
+		end
+	end
+	-- upper levels, then every level spreads (its own sub-seed: the rolls
+	-- above stay as they were)
+	local r2 = rng.new(rng.derive(gen.seed, LEVELS_SALT))
+	for k = 0, MAP * MAP - 1 do
+		local cell = gen.cells[k]
+		local f = places.features[cell.kind]
+		if f and f.above and k ~= gen.goal and r2() < (f.above.chance or 1) then
+			cell.above = { kind = f.above.kind, from = "outside" }
+		end
+	end
+	for k = 0, MAP * MAP - 1 do
+		local cell = gen.cells[k]
+		local f = places.features[cell.kind]
+		for _, layer in ipairs({ "below", "above" }) do
+			if f and f[layer] and cell[layer] and cell[layer].from then
+				grow(gen, r2, k, layer, f[layer])
+			end
+		end
+	end
+	for k = 0, MAP * MAP - 1 do
+		local cell = gen.cells[k]
+		local notGoal = k ~= gen.goal
+		if cell.below and cell.below.from == nil then
+			cell.belowEnemies = notGoal and enemyCount(r2, tables, cell.below.kind, cell, alone) or 0
+		end
+		cell.aboveEnemies = cell.above and notGoal and enemyCount(r2, tables, cell.above.kind, cell, alone) or 0
+	end
+	-- where each chest goes: only into a level this area has its own way
+	-- to (a spread-to level is found from its neighbor)
+	for k = 0, MAP * MAP - 1 do
+		local cell = gen.cells[k]
+		local f = places.features[cell.kind]
+		if f and cell.chest and cell.role ~= "start" and f.chest and r2() < (f.chestChance or 1) then
+			local own = function(layer)
+				return cell[layer] and cell[layer].from ~= nil
+			end
+			local at = f.chest
+			if at == "deepest" then
+				at = own("below") and "below" or "inside"
+			elseif at == "highest" then
+				at = own("above") and "above" or nil
+			end
+			if (at == "inside" and cell.inside) or (at == "below" and own("below")) or (at == "above" and own("above")) then
+				cell.chestAt = at
+			end
 		end
 	end
 	-- passages: neighbors in the same act, both with stairs down, a listed pair
@@ -87,7 +173,7 @@ local function rollFeatures(gen, tables, alone)
 			local x, y = cell.x + d[1], cell.y + d[2]
 			if x < MAP and y < MAP then
 				local other = gen.cells[y * MAP + x]
-				if cell.below and other.below and cell.act == other.act and r() < pairChance(cell.kind, other.kind) then
+				if cell.below and other.below and cell.act == other.act and not cell.underLinks[d[3]] and r() < pairChance(cell.kind, other.kind) then
 					-- a hidden passage: behind a web between caves, rubble elsewhere
 					local link = {}
 					if r() < (places.hiddenPassages or 0) then

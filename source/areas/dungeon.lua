@@ -4,7 +4,8 @@
 -- The deepest room holds the NPC, locked in a barred cell against the
 -- north or south wall (whichever has no doorway). The cell door opens with
 -- the cell key, which is in a chest in another dungeon room (chests are
--- placed by areas/area.lua).
+-- placed by areas/area.lua). Some rooms have stairs up to the tower (the
+-- dungeon's upper level, areas/interiors.lua).
 
 local layout <const> = Game.layout
 local rng <const> = Game.rng
@@ -53,6 +54,7 @@ Game.areaKinds.dungeon = {
 		if ctx.cell.role == "goal" then
 			buildCell(area, ctx, kit)
 		end
+		helpers.wayUp(area, ctx, anchors)
 		helpers.placeChest(area, ctx, anchors)
 
 		helpers.scatter(area, r, 0.14, kit.pillar, Game.walls.dungeon.pillar, anchors)

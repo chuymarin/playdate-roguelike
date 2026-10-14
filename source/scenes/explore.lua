@@ -45,10 +45,12 @@ local function toScreen(x, y)
 	return config.ORIGIN_X + (x - 1) * config.TILE, config.ORIGIN_Y + (y - 1) * config.TILE
 end
 
-function Explore.new(world, onWin)
+-- onEnd: called when the run is over (you won or died); main.lua starts a
+-- new world.
+function Explore.new(world, onEnd)
 	local self = setmetatable({
 		world = world,
-		onWin = onWin,
+		onEnd = onEnd,
 		player = Game.Player.new(Game.kits.characters.player[1]),
 		frame = 0,
 		held = nil,
@@ -58,12 +60,11 @@ function Explore.new(world, onWin)
 	local start = world:area("c" .. world.gen.start)
 	if start.door then
 		local home = world:area("h" .. world.gen.start)
-		world.respawn = { id = home.id, x = home.entry[1], y = home.entry[2] }
+		self:enter(home.id, home.entry[1], home.entry[2], "N")
 	else
 		local free = layout.byCenter(start, layout.freeCells(start, layout.anchors(start)))
-		world.respawn = { id = start.id, x = free[1][1], y = free[1][2] }
+		self:enter(start.id, free[1][1], free[1][2], "N")
 	end
-	self:enter(world.respawn.id, world.respawn.x, world.respawn.y, "N")
 	self:say(text.intro)
 	return self
 end
@@ -99,7 +100,6 @@ function Explore:enter(id, x, y, facing)
 	self.background = nil
 	if area.safe then
 		p.hearts = p.maxHearts
-		self.world.respawn = { id = area.id, x = area.respawn[1], y = area.respawn[2] }
 		self:toast(text.camp)
 	end
 end
@@ -236,7 +236,7 @@ function Explore:makeContext()
 		end,
 		win = function()
 			audio.play("win")
-			self:say(text.theEnd, self.onWin)
+			self:say(text.theEnd, self.onEnd)
 		end,
 	}
 end
@@ -393,14 +393,10 @@ function Explore:hurtPlayer(enemy)
 			self:push(enemy, d[3])
 		end
 	end
+	-- a roguelike: at 0 hearts the run is over and a new world begins
 	if p.hearts <= 0 then
 		audio.play("faint")
-		self:say(text.faint, function()
-			p.hearts = p.maxHearts
-			p.invulnerable = 0
-			local rs = self.world.respawn
-			self:enter(rs.id, rs.x, rs.y, "S")
-		end)
+		self:say(text.died, self.onEnd)
 	end
 end
 

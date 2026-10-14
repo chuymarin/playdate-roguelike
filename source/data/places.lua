@@ -19,10 +19,19 @@
 --                 cover   hides the stairs until you walk into it:
 --                         "grave" (pushed aside), "rubble" (pushed aside),
 --                         "web" (torn; the cave mouth is in the area's
+--                         border), "mouth" (an open cave mouth in the
 --                         border); none: the stairs are in plain sight
+--                 spread  how many more cells of the same act the level
+--                         can grow over, joined in the act's piece (no
+--                         stairs there: you walk in through passages)
+--                 over    the kinds of cells it can grow over
+--      above    an upper level, reached by stairs up (never locked):
+--                 kind, chance, spread, over (as for below)
 --      chest    where the area's chest goes: "inside", "below" (when it
---               has a lower level), "deepest" (below, else inside);
---               none: out in the open
+--               has a lower level), "deepest" (below, else inside),
+--               "highest" (up top, else in the open); none: out in the
+--               open. Only into a level the area has its own way to.
+--      chestChance  how often the chest follows `chest` (default 1)
 -- 3. connections  the lower levels of two neighboring areas of the same
 --              act join (a passage through their walls) when BOTH got
 --              stairs down and their two kinds are listed here

@@ -52,4 +52,17 @@ local function scan(t)
 end
 scan(Game.text)
 check(longest <= 92, "longest line " .. longest .. " characters")
+-- dying ends the run: after the last line a new world begins
+Game.newWorld(5)
+local before = stub.explore
+before.dialogue = nil
+before.player.hearts = 1
+before.player.invulnerable = 0
+before:hurtPlayer({ x = -9, y = -9 }) -- far off: no knock-back
+check(before.player.hearts == 0 and before.dialogue ~= nil, "dying says so")
+for _ = 1, 10 do
+  if stub.explore ~= before then break end
+  stub.frame({ "A" }); stub.frame({})
+end
+check(stub.explore ~= before, "dying starts a new world")
 print(fails == 0 and ("unit_polish: all passed (" .. seen .. " villagers, longest line " .. longest .. ")") or ("unit_polish: " .. fails .. " failed"))

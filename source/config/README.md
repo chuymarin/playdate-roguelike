@@ -14,7 +14,7 @@ finished. A file that isn't valid JSON stops the game at startup with
 |---|---|
 | `settings.json` | Hearts, walking speed, effect speed, fixed seeds for testing |
 | `story.json` | The four acts: which places each rolls, what its chests hold, enemies |
-| `places.json` | Optional places, what each place gets (inside, stairs down, chest), which lower levels connect |
+| `places.json` | Optional places, what each place gets (inside, stairs down or up, chest), how far levels spread, which lower levels connect |
 | `items.json` | What each item does and what it says when you pick it up |
 | `text.json` | Every line the game shows |
 | `kits.json` | Which tiles everything uses (made with the Kit Builder) |
@@ -27,8 +27,9 @@ finished. A file that isn't valid JSON stops the game at startup with
 - `effectFrameTime`: frames each tile of an effect (hit, hurt...) shows.
 - `seeds`: build every area of a kind from one seed, to test one design
   everywhere, e.g. `{"cave": 42, "house": 7}`. Kinds: town, ruinedTown,
-  church, cemetery, forest, creepyForest, ruins, camp, entrance, dungeon;
-  insides and lower levels: house, ruinedHouse, chapel, crypt, cave, cellar.
+  church, cemetery, forest, creepyForest, mountain, ruins, camp, entrance,
+  dungeon; insides and lower levels: house, ruinedHouse, chapel, crypt,
+  cave, cellar; upper levels: ridge, tower.
 
 ## story.json
 
@@ -43,8 +44,8 @@ finished. A file that isn't valid JSON stops the game at startup with
     `"farthest"` (farthest from where you come into the region), `"any"`
     (a random area without a chest), `"rest"` (every area left).
 - `enemies`: per kind of area, `min` to `max` enemies (each extra one with
-  `chance`). Insides and lower levels (ruinedHouse, crypt, cave, cellar)
-  have their own rows.
+  `chance`). Insides, lower and upper levels (ruinedHouse, crypt, cave,
+  cellar, ridge, tower) have their own rows.
 - `firstAct`: at most this many enemies per area in Act I.
 - `alone`: an area whose chest holds one of these items has one enemy at most.
 
@@ -58,10 +59,24 @@ finished. A file that isn't valid JSON stops the game at startup with
   - `below`: stairs down to a lower level: `kind` (crypt, cave, cellar),
     `chance`, `from` (`"outside"` or `"inside"` the building), `cover`
     (`"grave"` or `"rubble"`: pushed aside; `"web"`: torn, a cave mouth in
-    the area's edge; none: stairs in plain sight).
-  - `chest`: where the area's chest goes: `"inside"`, `"below"`, or
-    `"deepest"` (below if it has stairs, else inside). Leave it out for the
-    open area.
+    the area's edge; `"mouth"`: an open cave mouth in the edge; none:
+    stairs in plain sight).
+  - `above`: stairs up to an upper level (never locked): `kind` (ridge,
+    tower), `chance`. Never over Act IV's entrance or the captive's room.
+  - `spread` and `over` (in `below` or `above`): the level can grow over
+    up to `spread` more cells of the same act, joined to it in the piece,
+    of the kinds in `over` (each extra cell has a 60% chance). Those cells
+    have no stairs of their own: you walk in through passages, so the
+    level takes part of the act's tetromino shape.
+  - `chest`: where the area's chest goes: `"inside"`, `"below"`, `"deepest"`
+    (below if it has stairs, else inside), or `"highest"` (up top if it
+    has stairs up, else in the open). Leave it out for the open area. A
+    chest only goes into a level the area has its own stairs or door to.
+    Keys can end up inside, below or up top this way: every way there is
+    open (covers are pushed aside, stairs up are never locked), so a key is
+    never behind the lock it opens.
+  - `chestChance`: how often the chest follows `chest` (default 1); the
+    rest stay in the open.
 - `hiddenPassages`: the chance a passage between lower levels is blocked by
   a web (between caves) or rubble that you push away.
 - `connections`: which places' lower levels join when two neighbors in the
@@ -70,7 +85,9 @@ finished. A file that isn't valid JSON stops the game at startup with
 
 ## items.json
 
-- `order`: the order the HUD shows carried items in.
+- `slots`: items the HUD always has a slot for (the shield and the
+  weapon): an empty frame until you find them, then the world's own tile.
+- `order`: the order the HUD shows other carried items in.
 - Per item: `ability` (`"swing"` on Ⓐ or `"guard"` on Ⓑ), `consumed`
   (keys), `heart` (one more heart, all refilled), `quiet` (a toast instead
   of a dialogue), `lines` / `toast`: the key in `text.json` of what it says.

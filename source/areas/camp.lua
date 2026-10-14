@@ -1,6 +1,5 @@
 -- Camp: a safe clearing with a tent and a fire, never any enemies.
--- Walking in refills your hearts and makes it the place you wake up after
--- fainting.
+-- Walking in refills your hearts.
 
 local layout <const> = Game.layout
 local rng <const> = Game.rng
@@ -31,9 +30,6 @@ Game.areaKinds.camp = {
 				end
 			end
 		end
-		local free = layout.byCenter(area, layout.freeCells(area, anchors))
-		area.respawn = free[1] or anchors[1]
-		area.reserved[layout.key(area.respawn[1], area.respawn[2])] = true
 		helpers.placeChest(area, ctx, anchors)
 		helpers.scatter(area, r, 0.08, kit.decor, Game.walls.camp.decor, anchors)
 	end,

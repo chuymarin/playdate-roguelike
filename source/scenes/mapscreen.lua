@@ -80,12 +80,17 @@ function MapScreen:draw()
 		end
 	end
 
-	-- where you are: your tile (or the way in, when inside) and a blinking frame
+	-- where you are: your tile (or the way in, when inside, below or up
+	-- top; on a level spread over from a neighbor's, your spot) and a
+	-- blinking frame
 	local k = here.cell.k
 	local ax, ay = (k % config.MAP) * AREA_W, (k // config.MAP) * AREA_H
-	local outside = world.areas["c" .. k]
+	local outside = world.areas["c" .. k] -- not built yet when you came in from a neighbor's level
 	local px, py = self.explore.player.x, self.explore.player.y
-	local way = here.interior and (outside.door or outside.down)
+	local layer = here.id:sub(1, 1)
+	local below = here.cell.below
+	local way = outside and (layer == "h" and outside.door or layer == "a" and outside.up
+		or layer == "u" and (below.from == "inside" and outside.door or outside.down))
 	if way then
 		px, py = way.x, way.y
 	end

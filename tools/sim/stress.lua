@@ -27,6 +27,7 @@ for seed = 1, N do
     local anchors = layout.anchors(a)
     if a.door then anchors[#anchors + 1] = { a.door.frontX, a.door.frontY } end
     if a.down then anchors[#anchors + 1] = { a.down.frontX, a.down.frontY } end
+    if a.up then anchors[#anchors + 1] = { a.up.frontX, a.up.frontY } end
     if not layout.connected(a, anchors) then bad("anchors disconnected " .. cell.kind) end
     -- doorway cells must line up with the neighbor's
     for dir in pairs(cell.links) do
@@ -42,9 +43,11 @@ for seed = 1, N do
       return false
     end
     local chests, npcs = Game.objects.ofKind(a, "chest"), Game.objects.ofKind(a, "npc")
-    -- the layers: inside ("h") and lower level ("u")
+    -- the layers: inside ("h"), lower level ("u"), upper level ("a")
     if cell.inside and not a.door then bad("no door " .. cell.kind) end
     if cell.below and cell.below.from == "outside" and not a.down then bad("no way down " .. cell.kind) end
+    if cell.above and cell.above.from and not a.up then bad("no way up " .. cell.kind) end
+    if cell.above and not cell.above.from and a.up then bad("stairs up in a spread-to cell") end
     local chestsTotal = #chests
     local layers = {}
     local function checkLayer(id)
@@ -52,7 +55,10 @@ for seed = 1, N do
       if not ok2 then bad("layer build error " .. id:sub(1, 1) .. ": " .. tostring(h)) return nil end
       count(id:sub(1, 1) .. " " .. h.kind)
       layers[#layers + 1] = h
-      if #h.portals == 0 or not layout.connected(h, { { h.portals[1].x, h.portals[1].y }, h.entry }) then bad("layer exit blocked " .. h.kind) end
+      local spread = id:sub(1, 1) ~= "h" and not (id:sub(1, 1) == "u" and cell.below.from or id:sub(1, 1) == "a" and cell.above.from)
+      if spread then
+        if #h.portals > 0 then bad("stairs in a spread-to level " .. h.kind) end
+      elseif #h.portals == 0 or not layout.connected(h, { { h.portals[1].x, h.portals[1].y }, h.entry }) then bad("layer exit blocked " .. h.kind) end
       local hAnchors = layout.anchors(h, { h.entry })
       if not layout.connected(h, hAnchors) then bad("layer passages cut off " .. h.kind) end
       local hd = layout.reach(h, { h.entry }, h.occupied)
@@ -63,7 +69,7 @@ for seed = 1, N do
           if not s then bad(o.kind .. " unreachable in " .. h.kind) end
         end
       end
-      local want = id:sub(1, 1) == "h" and (cell.insideEnemies or 0) or (cell.belowEnemies or 0)
+      local want = id:sub(1, 1) == "h" and (cell.insideEnemies or 0) or id:sub(1, 1) == "a" and (cell.aboveEnemies or 0) or (cell.belowEnemies or 0)
       if cell.role == "start" then want = #h.enemySpawns end
       if #h.enemySpawns ~= want then bad(("layer enemies %d/%d in %s"):format(#h.enemySpawns, want, h.kind)) end
       chestsTotal = chestsTotal + #Game.objects.ofKind(h, "chest")
@@ -72,21 +78,32 @@ for seed = 1, N do
     end
     local h = a.door and checkLayer("h" .. k)
     if cell.below and cell.below.from == "inside" and h and not h.down then bad("no stairs down in " .. h.kind) end
-    if a.down or (h and h.down) then
-      local u = checkLayer("u" .. k)
-      if u then
-        for dir in pairs(cell.underLinks or {}) do
-          if not u.openings[dir] then bad("passage missing") end
-          local nb = world:neighbor(k, dir)
-          local okN, un = pcall(world.area, world, "u" .. nb)
-          if not okN then bad("neighbor lower level missing " .. tostring(un)) else
-            local mine, theirs = u.openings[dir][1], un.openings[grid.OPP[dir]][1]
-            if (dir == "N" or dir == "S") and mine[1] ~= theirs[1] or (dir == "E" or dir == "W") and mine[2] ~= theirs[2] then bad("passages misaligned") end
-            if world.gen.cells[nb].act ~= cell.act then bad("passage across acts") end
-          end
-          count("passage")
+    local function checkLinks(level, prefix, links)
+      for dir in pairs(links or {}) do
+        if not level.openings[dir] then bad("passage missing") end
+        local nb = world:neighbor(k, dir)
+        local okN, un = pcall(world.area, world, prefix .. nb)
+        if not okN then bad("neighbor level missing " .. tostring(un)) else
+          local mine, theirs = level.openings[dir][1], un.openings[grid.OPP[dir]][1]
+          if (dir == "N" or dir == "S") and mine[1] ~= theirs[1] or (dir == "E" or dir == "W") and mine[2] ~= theirs[2] then bad("passages misaligned") end
+          if world.gen.cells[nb].act ~= cell.act then bad("passage across acts") end
         end
+        count(prefix == "u" and "passage" or "upper passage")
       end
+    end
+    if cell.below and (cell.below.from == nil or a.down or (h and h.down)) then
+      local u = checkLayer("u" .. k)
+      if u then checkLinks(u, "u", cell.underLinks) end
+      if not cell.below.from then count("spread below") end
+    end
+    if cell.above then
+      local up = checkLayer("a" .. k)
+      if up then
+        checkLinks(up, "a", cell.overLinks)
+        if a.up and (up.portals[1].x ~= a.up.x or up.portals[1].y ~= a.up.y) then bad("stairs up and down don't line up") end
+        if cell.kind == "entrance" or cell.role == "goal" then bad("upper level over " .. tostring(cell.role)) end
+      end
+      if not cell.above.from then count("spread above") end
     end
     for _, sec in ipairs(Game.objects.ofKind(a, "secret")) do
       if not (a.down and sec.x == a.down.x and sec.y == a.down.y) then bad("secret not on the way down") end
@@ -117,7 +134,6 @@ for seed = 1, N do
         end
       end
     end
-    if cell.kind == "camp" and not a.respawn then bad("camp without respawn") end
     for _, g in ipairs(Game.objects.ofKind(a, "gate")) do if not walkable(a, g.x, g.y) then bad("gate tile solid") end end
     local wantGates = (cell.locked and 1 or 0) + (cell.lockedTo and 1 or 0)
     for _ in pairs(cell.gates) do wantGates = wantGates + 1 end

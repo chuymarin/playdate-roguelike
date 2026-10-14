@@ -1,4 +1,5 @@
 {
+  "slots": ["shield", "sword"],
   "order": ["shield", "sword", "key", "cellKey", "coin"],
   "shield": { "ability": "guard", "lines": "shield" },
   "sword": { "ability": "swing", "lines": "sword" },

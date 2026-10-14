@@ -397,7 +397,7 @@ local function checkWorld(seed, withAreas)
 				fail(seed, "error building an area: " .. tostring(area))
 			else
 				local all = { area }
-				-- its inside and lower level, when there's a way to them
+				-- its inside, lower and upper level, when there's a way to them
 				local function layer(id)
 					local okL, l = pcall(world.area, world, id)
 					if okL then
@@ -409,6 +409,9 @@ local function checkWorld(seed, withAreas)
 				local inside = area.door and layer("h" .. k)
 				if area.down or (inside and inside.down) then
 					layer("u" .. k)
+				end
+				if area.up then
+					layer("a" .. k)
 				end
 				local chests = 0
 				for _, a in ipairs(all) do
